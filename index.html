@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+/* =====================================================
+   HOSTING DI GITHUB PAGES
+   Di Google Apps Script, google.script.run sudah ada dan blok ini tidak melakukan apa-apa.
+   Di GitHub Pages, google.script.run ditiru: setiap pemanggilan dikirim ke web app Apps Script (doPost).
+   ISI TRACER_API_URL dengan alamat web app (berakhiran /exec) dari Deploy > Manage deployments.
+===================================================== */
+(function () {
+  var TRACER_API_URL = 'https://script.google.com/macros/s/AKfycbwljAxwjiyMqD-07amjZVrwriomJYsPSEb591VRHSgwemQDC44dG7WtrqdD_IaefT8Maw/exec';
+  var MAKS_BERSAMAAN = 6;
+
+  if (window.google && google.script && google.script.run) return;   // sedang berjalan di Apps Script
+
+  var antri = [], jalan = 0;
+  function giliran() {
+    while (jalan < MAKS_BERSAMAAN && antri.length) { jalan++; antri.shift()(); }
+  }
+  function kirim(nama, args, ok, gagal, user) {
+    antri.push(function () {
+      var selesai = function () { jalan--; giliran(); };
+      var galat = function (e) { selesai(); if (typeof gagal === 'function') gagal(e, user); else console.error('[Tracer] ' + nama + ':', e); };
+      if (!TRACER_API_URL || /^ISI_/.test(TRACER_API_URL)) { galat(new Error('Alamat API belum diisi di index.html (TRACER_API_URL).')); return; }
+      fetch(TRACER_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // text/plain: tanpa preflight CORS
+        body: JSON.stringify({ fn: nama, args: args }),
+        redirect: 'follow'
+      }).then(function (r) { return r.text(); }).then(function (t) {
+        var d;
+        try { d = JSON.parse(t); } catch (e) { throw new Error('Balasan server tidak valid. Pastikan web app dideploy dengan akses Anyone.'); }
+        if (!d || d.ok !== true) throw new Error((d && d.error) || 'Galat server.');
+        return d.data === undefined ? null : d.data;
+      }).then(function (data) {
+        selesai();
+        if (typeof ok === 'function') setTimeout(function () { ok(data, user); }, 0);
+      }, galat);
+    });
+    giliran();
+  }
+  function bangun(ok, gagal, user) {
+    return new Proxy({}, { get: function (_, nama) {
+      if (typeof nama !== 'string' || nama === 'then') return undefined;
+      if (nama === 'withSuccessHandler') return function (f) { return bangun(f, gagal, user); };
+      if (nama === 'withFailureHandler') return function (f) { return bangun(ok, f, user); };
+      if (nama === 'withUserObject') return function (u) { return bangun(ok, gagal, u); };
+      return function () { kirim(nama, Array.prototype.slice.call(arguments), ok, gagal, user); };
+    } });
+  }
+  var G = window.google = window.google || {};
+  G.script = G.script || {};
+  G.script.run = bangun(null, null, undefined);
+})();
+</script>
+<base target="_top">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--b:#1a56db;--bg:#f4f6fa;--c:#fff;--t:#1f2937;--m:#6b7280;--l:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Arial,sans-serif;background:var(--bg);color:var(--t)}
+header{background:var(--b);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+main{max-width:1100px;margin:16px auto;padding:0 12px}
+.card{background:var(--c);border:1px solid var(--l);border-radius:10px;padding:14px;margin-bottom:14px}
+input,select,button{font:inherit;padding:7px 9px;border:1px solid #cbd5e1;border-radius:6px;width:100%}
+button{background:var(--b);color:#fff;border:0;cursor:pointer;width:auto}button.g{background:#fff;color:var(--t);border:1px solid #cbd5e1}
+button.r{background:#dc2626}header button{background:#fff;color:var(--b)}
+label{font-size:12px;color:var(--m);display:block;margin-bottom:3px}
+.stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat div{text-align:center}.stat b{font-size:24px;display:block}.stat span{font-size:12px;color:var(--m)}
+.bar{height:10px;background:var(--l);border-radius:5px;overflow:hidden;margin:4px 0 10px}.bar i{display:block;height:100%;background:var(--b)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;border-bottom:1px solid var(--l);text-align:left;vertical-align:middle}
+.sc{overflow-x:auto}.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:end}.row>*{flex:1;min-width:130px}.row button{flex:0 0 auto}
+.tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button{background:#fff;color:var(--t);border:1px solid #cbd5e1}.tabs button.on{background:var(--b);color:#fff}
+.hide{display:none!important}
+.lg{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:20px;background:linear-gradient(135deg,#0a2463 0%,#1a56db 55%,#0e9fa8 100%)}
+.lg .bg{position:absolute;inset:0;width:100%;height:100%}.bg.port{display:none}@media (max-aspect-ratio:1/1){.bg.land{display:none}.bg.port{display:block}}
+.trace{stroke-dasharray:3 11;animation:dash 40s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-1200}}
+@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+.fl{animation:fl 7s ease-in-out infinite}.fl2{animation-duration:9s;animation-delay:-3s}
+@media(prefers-reduced-motion:reduce){.trace,.fl{animation:none}}
+.wrap{position:relative;width:100%;max-width:410px;text-align:center}
+.box{background:rgba(255,255,255,.96);border-radius:20px;padding:30px 28px 26px;box-shadow:0 24px 60px rgba(5,20,70,.45);text-align:left;backdrop-filter:blur(6px)}
+.logo{width:64px;height:64px;border-radius:18px;margin:-62px auto 14px;background:linear-gradient(135deg,#1a56db,#0e9fa8);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(26,86,219,.45);border:4px solid #fff}
+.box h1{margin:0;text-align:center;font-size:21px;line-height:1.3;color:#0a2463}
+.box h1 span{display:block;font-size:14px;font-weight:600;color:#1a56db;margin-top:2px}
+.box .sub{text-align:center;color:var(--m);font-size:13px;margin:8px 0 20px}
+.f{position:relative;margin-bottom:14px}.f label{font-weight:600;color:#374151;margin-bottom:5px}
+.f svg.ic{position:absolute;left:12px;bottom:11px;width:18px;height:18px;stroke:#94a3b8;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.lg .f input{padding:11px 12px 11px 40px;border-radius:10px;border:1.5px solid #d1d5db;background:#f8fafc;font-size:15px}
+.lg .f input:focus{outline:0;border-color:var(--b);background:#fff;box-shadow:0 0 0 3px rgba(26,86,219,.18)}
+.eye{position:absolute;right:6px;bottom:6px;width:auto!important;background:transparent!important;color:var(--b)!important;border:0!important;font-size:12px;font-weight:600;padding:6px 8px!important}
+#bl{width:100%;padding:12px;border-radius:10px;font-size:15px;font-weight:600;margin-top:4px;background:linear-gradient(135deg,#1a56db,#1e40af);box-shadow:0 8px 18px rgba(26,86,219,.35)}
+#bl:disabled{opacity:.7;cursor:wait}
+#msg{color:#dc2626;font-size:13px;margin-top:10px;text-align:center;min-height:18px}
+.wrap .note{color:rgba(255,255,255,.85);font-size:12.5px;margin-top:16px}
+.pager{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px;margin:8px 0}.pager button{padding:5px 11px}.pager input{width:72px;padding:5px 8px}
+#busy{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#fffbeb;border:1px solid #fcd34d;color:#92400e;padding:8px 16px;border-radius:10px;font-size:14px;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.18);max-width:92vw;text-align:center}
+.err{color:#dc2626}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+.dn{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.leg{flex:1;min-width:200px}
+.lg2{display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0}.lg2 i{width:12px;height:12px;border-radius:3px;flex:none}.lg2 span{flex:1}.lg2 b{min-width:28px;text-align:right}.lg2 small{width:48px;text-align:right}
+.sy{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}.sy span{width:42px}.sb{flex:1;height:18px;background:#e5e7eb;border-radius:5px;overflow:hidden;display:flex}.sb i{display:block;height:100%}.sb em{font-size:11px;color:var(--m);padding:1px 6px;font-style:normal}.sy small{width:64px;text-align:right}
+.lt{font-size:12px}.lt th,.lt td{padding:5px 6px;border:1px solid #d1d5db}.lt th{background:#f1f5f9}.lt td.n{text-align:right}
+.lt3{margin:18px 0 8px;font-size:15px;border-bottom:2px solid var(--b);padding-bottom:3px;color:#0a2463}
+@media print{
+    @page{size:A4 landscape;margin:12mm}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{background:#fff}header,#tabs,.no-print{display:none!important}
+    main{max-width:none;margin:0;padding:0}
+    body.pr #app section:not(#v7){display:none!important}
+    .card{border:0;padding:0;margin:0}.sc{overflow:visible}
+    .lt tr,.stat>div{page-break-inside:avoid}.lt3{page-break-after:avoid}
+}
+@media(max-width:700px){
+    body{font-size:15px}
+    input,select,button{font-size:16px}
+    header{padding:10px 12px}header b{font-size:14px;line-height:1.25;flex:1}header>span{display:flex;gap:6px;flex:none}header button{padding:7px 10px;font-size:13px;white-space:nowrap}
+    main{margin:10px auto;padding:0 8px}
+    .tabs{overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px;-webkit-overflow-scrolling:touch}.tabs button{white-space:nowrap;flex:0 0 auto;padding:9px 13px}
+    .card{padding:12px}.row>*{min-width:0;flex:1 1 140px}.row button{flex:1 1 auto;padding:10px}
+    .pager button{padding:9px 14px}.pager input{width:76px;padding:8px}
+    .stat b{font-size:22px}.dn svg{margin:0 auto}
+    table.rt{display:block}table.rt tbody{display:block}
+    table.rt tr:first-child{display:none}
+    table.rt tr{display:block;border:1px solid var(--l);border-radius:10px;padding:10px;margin-bottom:10px;background:#fff}
+    table.rt td{display:block;border:0;padding:4px 0}
+    table.rt td::before{content:attr(data-l);display:block;font-size:11px;color:var(--m)}
+    table.rt td[data-l=""]::before{display:none}
+    table.rt td.nm{font-size:16px;font-weight:600}
+    table.rt td[data-l="No."]{font-size:12px;color:var(--m);padding:0}table.rt td[data-l="No."]::before{display:inline;content:"No. "}
+    table.rt td.act{display:flex;gap:6px;flex-wrap:wrap;padding-top:8px}table.rt td.act button{flex:1 1 auto;padding:11px}
+    table.rt td input,table.rt td select{padding:10px}
+}
+.ok{color:#16a34a}.warn{color:#b45309}small{color:var(--m)}
+</style>
+</head>
+<body>
+
+<div id="busy" class="hide" role="status"></div>
+<div id="login" class="lg">
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><g id="i-cap"><path d="M-22 -4 L0 -15 L22 -4 L0 7 Z"/><path d="M-12 1 V11 C-6 17 6 17 12 11 V1"/><path d="M22 -4 V10"/></g><g id="i-uni"><path d="M-20 -6 L0 -18 L20 -6 Z"/><path d="M-14 -2 V12 M0 -2 V12 M14 -2 V12"/><path d="M-20 16 H20"/></g><g id="i-job"><rect x="-18" y="-8" width="36" height="24" rx="3"/><path d="M-7 -8 V-13 H7 V-8"/><path d="M-18 3 H18"/></g><g id="i-biz"><path d="M-18 -6 L-14 -16 H14 L18 -6 Z"/><path d="M-16 -6 V16 H16 V-6"/><path d="M-5 16 V5 H5 V16"/></g><g id="i-cert"><rect x="-18" y="-14" width="36" height="26" rx="2"/><path d="M-10 -5 H10 M-10 1 H2"/><circle cx="9" cy="7" r="4"/></g>
+<pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.4" fill="#fff" fill-opacity=".13"/></pattern>
+<radialGradient id="gl" cx="85%" cy="10%" r="55%"><stop offset="0" stop-color="#5eead4" stop-opacity=".35"/><stop offset="1" stop-color="#5eead4" stop-opacity="0"/></radialGradient></defs></svg>
+    <svg class="bg land" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="100%" height="100%" fill="url(#dots)"/><rect width="100%" height="100%" fill="url(#gl)"/><g fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"><path class="trace" d="M150 640 C350 400 700 420 1010 170"/><path class="trace" d="M150 640 C500 600 800 300 1060 430"/><path class="trace" d="M150 640 C400 740 700 700 930 620"/><path class="trace" d="M150 640 C100 450 150 250 300 150"/></g><g stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(150,640)"><circle r="42" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-cap"/><text y="66" text-anchor="middle" fill="#fff" fill-opacity="0.9" stroke="none" font-size="15" font-weight="600" font-family="system-ui,Arial">Lulusan SMA</text></g><g transform="translate(1010,170)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-uni"/><text y="64" text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="14" font-weight="400" font-family="system-ui,Arial">Melanjutkan Pendidikan</text></g><g transform="translate(1060,430)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-job"/><text y="64" text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="14" font-weight="400" font-family="system-ui,Arial">Bekerja</text></g><g transform="translate(930,620)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-biz"/><text y="64" text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="14" font-weight="400" font-family="system-ui,Arial">Berwirausaha</text></g><g transform="translate(300,150)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-cert"/><text y="64" text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="14" font-weight="400" font-family="system-ui,Arial">Pelatihan</text></g></g><g fill="#fff"><circle class="fl" cx="520" cy="90" r="7" fill-opacity=".18"/><circle class="fl fl2" cx="760" cy="720" r="10" fill-opacity=".14"/><circle class="fl fl2" cx="90" cy="300" r="6" fill-opacity=".2"/><circle class="fl" cx="1130" cy="600" r="8" fill-opacity=".16"/></g></svg>
+    <svg class="bg port" viewBox="0 0 600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="100%" height="100%" fill="url(#dots)"/><rect width="100%" height="100%" fill="url(#gl)"/><g fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"><path class="trace" d="M135 880 C0 600 20 300 140 125"/><path class="trace" d="M135 880 C640 700 640 300 450 125"/><path class="trace" d="M135 880 C220 950 270 950 335 920"/><path class="trace" d="M135 880 C300 800 400 800 460 840"/></g><g stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(135,880)"><circle r="44" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-cap"/><text text-anchor="middle" fill="#fff" fill-opacity="0.9" stroke="none" font-size="20" font-weight="600" font-family="system-ui,Arial"><tspan x="0" dy="68">Lulusan SMA</tspan></text></g><g transform="translate(450,125)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-uni"/><text text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="20" font-weight="400" font-family="system-ui,Arial"><tspan x="0" dy="64">Melanjutkan</tspan><tspan x="0" dy="23">Pendidikan</tspan></text></g><g transform="translate(335,920)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-job"/><text text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="20" font-weight="400" font-family="system-ui,Arial"><tspan x="0" dy="64">Bekerja</tspan></text></g><g transform="translate(460,840)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-biz"/><text text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="20" font-weight="400" font-family="system-ui,Arial"><tspan x="0" dy="64">Berwirausaha</tspan></text></g><g transform="translate(140,125)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-cert"/><text text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="20" font-weight="400" font-family="system-ui,Arial"><tspan x="0" dy="64">Pelatihan</tspan></text></g></g><g fill="#fff"><circle class="fl" cx="300" cy="60" r="8" fill-opacity=".18"/><circle class="fl fl2" cx="540" cy="520" r="9" fill-opacity=".14"/><circle class="fl fl2" cx="60" cy="480" r="7" fill-opacity=".2"/></g></svg>
+    <div class="wrap">
+        <div class="box">
+            <div class="logo"><svg width="34" height="34" viewBox="-24 -20 48 40" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M-22 -4 L0 -15 L22 -4 L0 7 Z"/><path d="M-12 1 V11 C-6 17 6 17 12 11 V1"/><path d="M22 -4 V10"/></svg></div>
+            <h1>Tracer Study<span>Jenjang SMA Kab. Gunungkidul</span></h1>
+            <p class="sub">Operator sekolah dan alumni silakan masuk. Alumni: username dan password awal adalah NISN.</p>
+            <div class="f"><label for="u">Username</label>
+                <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
+                <input id="u" autocomplete="username" placeholder="Username atau NISN"></div>
+            <div class="f"><label for="p">Password</label>
+                <svg class="ic" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                <input id="p" type="password" autocomplete="current-password" placeholder="Masukkan password" style="padding-right:64px">
+                <button type="button" class="eye" onclick="eye()" id="ey">Lihat</button></div>
+            <button id="bl" onclick="doLogin()">Masuk</button>
+            <div id="msg"></div>
+        </div>
+        <div class="note">Pelacakan lulusan SMA se-Kabupaten Gunungkidul</div>
+    </div>
+</div>
+
+<div id="app" class="hide">
+    <header><b>Tracer Study — <span id="sk"></span></b><span><button onclick="tab(5)">Ganti Password</button> <button onclick="doLogout()">Keluar</button></span></header>
+    <main>
+        <div class="tabs" id="tabs">
+            <button id="t1" class="on" onclick="tab(1)">Dashboard</button>
+            <button id="t2" onclick="tab(2)">Isi Status Alumni</button>
+            <button id="t3" class="hide" onclick="tab(3)">Impor Excel</button>
+            <button id="t7" onclick="tab(7)">Laporan</button>
+            <button id="t6" class="hide" onclick="tab(6)">Kelola Operator</button>
+        </div>
+
+        <section id="v1">
+            <div class="card"><div class="row"><div><label>Tahun lulus</label><select id="fy" onchange="renderDash()"></select></div></div>
+                <div class="stat" id="stat"></div></div>
+            <div class="card"><b>Grafik status alumni</b> <small>(dari alumni yang sudah mengisi; lingkaran mengikuti filter tahun di atas)</small>
+                <div class="cols" style="margin-top:12px"><div id="chDonut"></div><div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Komposisi status per tahun lulus</div><div id="chYear"></div></div></div></div>
+            <div class="card sc">
+                <div class="row"><b style="flex:2;min-width:200px">Rekap Jumlah Lulusan per Tahun</b>
+                    <div id="wRs" class="hide"><label>Sekolah</label><select id="rs" onchange="renderRekap()"></select></div></div>
+                <table id="rk"></table>
+                <div id="rjT" style="margin:14px 0 4px;font-weight:600"></div>
+                <table id="rj"></table>
+                <small id="rkNote"></small>
+            </div>
+            <div class="card"><b>Persentase per status</b> <small>(dari alumni yang sudah diisi)</small><div id="bars" style="margin-top:10px"></div></div>
+            <div class="card sc"><b>Rekap per tahun lulus</b><table id="rekap"></table></div>
+            <div class="card sc hide" id="cSek"><b>Progres pengisian per sekolah</b><table id="rekapSek"></table></div>
+        </section>
+
+        <section id="v2" class="hide">
+            <div class="card">
+                <div class="row">
+                    <div><label>Cari</label><input id="q" placeholder="Nama / NISN" oninput="rt()"></div>
+                    <div id="wSk" class="hide"><label>Sekolah</label><select id="fsk" onchange="rt()"></select></div>
+                    <div><label>Tahun lulus</label><select id="fy2" onchange="rt()"></select></div>
+                    <div><label>Tampilkan</label><select id="fs" onchange="rt()"><option value="">Semua</option><option value="belum">Belum diisi</option><option value="sudah">Sudah diisi</option></select></div>
+                    <div style="max-width:150px"><label>Baris per halaman</label><select id="fps" onchange="rt()"><option>50</option><option selected>100</option><option>200</option><option>300</option></select></div>
+                    <button class="g" onclick="exportCsv()">Unduh CSV</button>
+                </div>
+                <div class="pager" id="pgT"></div>
+                <div class="sc"><table id="tb" class="rt"></table></div>
+                <div class="pager" id="pgB"></div>
+                <small>Isian yang belum ditekan <b>Simpan</b> akan hilang saat pindah halaman atau mengubah filter.</small>
+            </div>
+        </section>
+
+        <section id="v3" class="hide">
+            <p style="font-size:13px;margin:0 0 10px">Alur: pilih file, klik <b>Periksa file</b> dan baca laporannya (baris bermasalah beserta alasannya), lalu klik <b>Impor sekarang</b> bila sudah sesuai.</p>
+            <div class="card">
+                <b>1. Impor data siswa</b>
+                <p style="font-size:13px;margin:6px 0">File Excel (.xlsx) dengan kolom: <b>Sekolah, TahunLulus, NISN, Nama</b> (opsional: <b>NPSN</b>, JK, Kota, Telepon). Siswa dengan NISN yang sudah ada ditolak sebagai duplikat.</p>
+                <div class="row"><input type="file" id="fA" accept=".xlsx,.xls,.csv" onchange="impReset('A')"><button onclick="imp('A',true)">Periksa file</button><button id="bA" disabled onclick="imp('A',false)">Impor sekarang</button><button class="g" onclick="tpl('A')">Unduh template</button></div>
+                <div id="mA" style="font-size:13px"></div>
+                <div id="lA" class="sc"></div>
+            </div>
+            <div class="card">
+                <b>2. Impor akun operator sekolah</b>
+                <p style="font-size:13px;margin:6px 0">Kolom: <b>Username, Password, Sekolah</b> (opsional: <b>NPSN</b>). <span class="warn">Sebaiknya isi NPSN agar pencocokan sekolah akurat. Hapus file Excel setelah diimpor karena berisi password.</span></p>
+                <div class="row"><input type="file" id="fO" accept=".xlsx,.xls,.csv" onchange="impReset('O')"><button onclick="imp('O',true)">Periksa file</button><button id="bO" disabled onclick="imp('O',false)">Impor sekarang</button><button class="g" onclick="tpl('O')">Unduh template</button></div>
+                <div id="mO" style="font-size:13px"></div>
+                <div id="lO" class="sc"></div>
+            </div>
+            <div class="card">
+                <b>3. Impor rekap jumlah lulusan (data dinas)</b>
+                <p style="font-size:13px;margin:6px 0">Kolom: <b>Jenjang, Nama Sekolah, NPSN, Program Keahlian/Jurusan, Tahun, L (Laki-laki), P (Perempuan), Jumlah</b>. Mengimpor ulang akan <b>mengganti</b> seluruh rekap lama.</p>
+                <div class="row"><input type="file" id="fR" accept=".xlsx,.xls,.csv" onchange="impReset('R')"><button onclick="imp('R',true)">Periksa file</button><button id="bR" disabled onclick="imp('R',false)">Impor sekarang</button><button class="g" onclick="tpl('R')">Unduh template</button></div>
+                <div id="mR" style="font-size:13px"></div>
+                <div id="lR" class="sc"></div>
+            </div>
+        </section>
+
+        <section id="v7" class="hide">
+            <div class="card no-print">
+                <div class="row">
+                    <div><label>Tahun lulus</label><select id="lyr" onchange="renderLaporan()"></select></div>
+                    <div id="wLs" class="hide"><label>Sekolah</label><select id="lsk" onchange="renderLaporan()"></select></div>
+                    <button onclick="cetak()">Cetak / Simpan PDF</button><button class="g" onclick="exportXlsx()">Unduh Excel</button>
+                </div>
+                <small>Pratinjau di bawah inilah yang dicetak atau diunduh. Di dialog cetak, pilih "Simpan sebagai PDF" untuk membuat file PDF.</small>
+            </div>
+            <div id="lap" class="card"></div>
+        </section>
+
+        <section id="v6" class="hide">
+            <div class="card">
+                <b>Tambah akun operator</b>
+                <div class="row" style="margin-top:8px">
+                    <div><label>Username</label><input id="oU" autocomplete="off"></div>
+                    <div><label>Password (min. 6)</label><input id="oP" autocomplete="off"></div>
+                    <div style="flex:2"><label>Nama sekolah</label><input id="oS"></div>
+                    <div><label>NPSN (8 digit)</label><input id="oN" inputmode="numeric" maxlength="8"></div>
+                    <button onclick="opAdd()">Tambah</button>
+                </div>
+                <div id="oM" style="font-size:13px"></div>
+            </div>
+            <div class="card">
+                <div class="row"><b style="flex:2;min-width:160px">Daftar operator</b><div><input id="oQ" placeholder="Cari username / sekolah" oninput="renderOps()"></div></div>
+                <div id="oMsg" style="font-size:13px;margin-bottom:8px"></div>
+                <div class="sc"><table id="ot" class="rt"></table></div>
+            </div>
+            <div class="card">
+                <b>Pencocokan sekolah dengan NPSN</b>
+                <p style="font-size:13px;margin:6px 0">Melengkapi NPSN yang masih kosong pada data siswa dan akun operator, berdasarkan nama sekolah yang cocok dengan file rekap atau akun operator ber-NPSN. Sekolah yang tidak ditemukan akan dilaporkan.</p>
+                <button onclick="doNpsn()">Lengkapi NPSN otomatis</button>
+                <div id="nM" style="font-size:13px;margin-top:8px"></div>
+            </div>
+        </section>
+
+        <section id="v4" class="hide">
+            <div class="card"><b id="sNama" style="font-size:17px"></b><div id="sInfo" style="font-size:13px;color:var(--m);margin-top:4px"></div></div>
+            <div class="card hide" id="pwBan" style="background:#fffbeb;border-color:#fcd34d;font-size:13px">Password Anda saat ini masih sama dengan NISN. Demi keamanan, silakan ganti lewat tombol <b>Ganti Password</b> di kanan atas.</div>
+            <div class="card">
+                <b>Apa kegiatan Anda setelah lulus?</b>
+                <div class="row" style="margin-top:10px"><div style="flex:2"><label>Status *</label><select id="ss" onchange="phS()"></select></div></div>
+                <div class="row"><div><label id="sli">Instansi / lembaga</label><input id="si"></div><div><label id="sld">Keterangan</label><div id="sdw"></div></div></div>
+                <div class="row"><div><label>Kota domisili</label><input id="sk2"></div><div><label>No. HP / WhatsApp</label><input id="st2" inputmode="tel"></div></div>
+                <div class="row"><button onclick="saveSaya()">Simpan</button></div>
+                <div id="sm" style="font-size:13px"></div>
+            </div>
+        </section>
+
+        <section id="v5" class="hide">
+            <div class="card" style="max-width:440px">
+                <b>Ganti Password</b>
+                <div style="margin-top:10px"><label>Password lama</label><input id="pl" type="password" autocomplete="current-password"></div>
+                <div style="margin-top:8px"><label>Password baru (minimal 6 karakter)</label><input id="pb" type="password" autocomplete="new-password"></div>
+                <div style="margin-top:8px"><label>Ulangi password baru</label><input id="pb2" type="password" autocomplete="new-password"></div>
+                <p style="font-size:12px;color:var(--m);margin:8px 0 0">Alumni yang belum pernah mengganti password: password lama adalah NISN.</p>
+                <div class="row" style="margin-top:12px"><button onclick="savePw()">Simpan</button><button class="g" onclick="home()">Kembali</button></div>
+                <div id="pm" style="font-size:13px"></div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+const ST=['Melanjutkan Pendidikan','Bekerja','Berwirausaha','Mengikuti Pendidikan Nonformal/Pelatihan','Belum Bekerja','Kegiatan Lainnya'];
+const BB='Belum Bekerja',SUB=['Sedang mencari pekerjaan','Sedang mempersiapkan seleksi kuliah','Menunggu panggilan kerja','Belum mencari pekerjaan','Lainnya'];
+const PH={'Melanjutkan Pendidikan':['Perguruan tinggi','Program studi'],'Bekerja':['Perusahaan / instansi','Jabatan'],'Berwirausaha':['Nama usaha','Bidang usaha'],'Mengikuti Pendidikan Nonformal/Pelatihan':['Lembaga penyelenggara','Nama pelatihan'],'Belum Bekerja':['-','Keterangan'],'Kegiatan Lainnya':['-','Keterangan']};
+const dtCell=(st,v,ph)=>st===BB?`<select class="dt"><option value="">— pilih keterangan —</option>${SUB.map(x=>`<option${x===v?' selected':''}>${x}</option>`).join('')}</select>`:`<input class="dt" placeholder="${ph}" value="${esc(v)}">`;
+let T='',U=null,D=[],R=[],PRE=null;
+const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
+T=ls.get('ts_t')||'';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const once=(fn,a)=>new Promise((ok,no)=>google.script.run.withSuccessHandler(ok).withFailureHandler(no)[fn](...a));
+const TRANSIENT=/SERVER_SIBUK|lock timeout|could not obtain lock|simultan|bersamaan|too many (scripts|simultaneous|invocations)|invoked too many|terlalu banyak (skrip|script)|unavailable|tidak tersedia|temporar|time.?out|network|jaringan|failed to fetch|server error/i;
+function busy(m){const b=$('busy');if(m){b.textContent=m;b.classList.remove('hide')}else b.classList.add('hide')}
+async function call(fn,...a){
+    const wait=[1500,3000,6000,10000],max=wait.length;
+    for(let i=0;;i++){
+        try{const r=await once(fn,a);busy('');return r}
+        catch(e){
+            const msg=String((e&&e.message)||e),transient=TRANSIENT.test(msg);
+            if(!transient||i>=max){busy('');throw transient?new Error('Server sedang sibuk. Silakan coba lagi beberapa saat lagi.'):e}
+            busy(`Server sedang sibuk, mencoba lagi... (${i+1}/${max})`);
+            await new Promise(r=>setTimeout(r,wait[i]*(0.7+Math.random()*0.6)));
+        }
+    }
+}
+try{U=JSON.parse(ls.get('ts_u'));if(T&&U)start();}catch(e){}
+$('p').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+$('u').addEventListener('keydown',e=>{if(e.key==='Enter')$('p').focus()});
+
+function eye(){const p=$('p'),h=p.type==='password';p.type=h?'text':'password';$('ey').textContent=h?'Sembunyi':'Lihat'}
+async function doLogin(){
+    const bl=$('bl');$('msg').textContent='';bl.disabled=true;bl.textContent='Memproses...';
+    try{const r=await call('login',$('u').value,$('p').value);T=r.token;U=r.user;PRE=r.data||null;
+        ls.set('ts_t',T);ls.set('ts_u',JSON.stringify(U));await start();}
+    catch(e){$('msg').textContent=e.message||'Login gagal, coba lagi.'}
+    bl.disabled=false;bl.textContent='Masuk';
+}
+function doLogout(){
+    PRE=null;busy('');
+    if(T)call('logout',T).catch(()=>{});
+    T='';U=null;D=[];R=[];ls.del('ts_t');ls.del('ts_u');
+    $('app').classList.add('hide');$('login').classList.remove('hide');
+    $('u').value='';$('p').value='';$('p').type='password';$('ey').textContent='Lihat';$('msg').textContent='';
+    $('q').value='';$('fs').value='';$('rs').innerHTML='';$('fsk').innerHTML='';$('lsk').innerHTML='';$('lyr').innerHTML='';PG=1;['pl','pb','pb2'].forEach(i=>$(i).value='');$('sm').textContent='';$('pm').textContent='';tab(1);$('u').focus();
+}
+async function start(){
+    $('login').classList.add('hide');$('app').classList.remove('hide');
+    const adm=U.role==='admin',alm=U.role==='alumni';
+    $('sk').textContent=U.sekolah;$('t3').classList.toggle('hide',!adm);$('cSek').classList.toggle('hide',!adm);$('wRs').classList.toggle('hide',!adm);
+    $('tabs').classList.toggle('hide',alm);$('t6').classList.toggle('hide',!adm);$('wLs').classList.toggle('hide',!adm);$('wSk').classList.toggle('hide',!adm);
+    await load();
+    if(alm){fillSaya();tab(4)}else tab(1);
+}
+async function load(){
+    try{if(PRE){D=PRE;R=[];PRE=null}else{D=await call('getAlumni',T);R=U.role==='alumni'?[]:await call('getRekap',T).catch(()=>[])}}catch(e){alert(e.message);if(/Sesi/.test(e.message))doLogout();return}
+    // Tahun pada filter = tahun alumni terdata + tahun pada rekap lulusan (termasuk dari aplikasi Laporan Kelulusan)
+    const yrs=[...new Set(D.map(d=>Number(d.TahunLulus)).concat(R.map(r=>Number(r.Tahun))))].filter(Boolean).sort((a,b)=>b-a);
+    const opt='<option value="">Semua tahun</option>'+yrs.map(y=>`<option>${y}</option>`).join('');
+    const a=$('fy').value,b=$('fy2').value;$('fy').innerHTML=opt;$('fy2').innerHTML=opt;$('fy').value=a;$('fy2').value=b;
+    const sks=[...new Set(D.map(d=>d.Sekolah))].sort(),cs=$('fsk').value;
+    $('fsk').innerHTML='<option value="">Semua sekolah</option>'+sks.map(x=>`<option>${esc(x)}</option>`).join('');$('fsk').value=sks.includes(cs)?cs:'';
+    fillLap();renderDash();renderTable();
+}
+function tab(n){if(n===6)loadOps();if(n===7)renderLaporan();[1,2,3,4,5,6,7].forEach(i=>{const v=$('v'+i),b=$('t'+i);if(v)v.classList.toggle('hide',i!==n);if(b)b.classList.toggle('on',i===n)})}
+function home(){tab(U&&U.role==='alumni'?4:1)}
+const done=d=>ST.indexOf(d.Status)>=0;
+function cnt(rows){const c={};ST.forEach(s=>c[s]=0);rows.forEach(r=>{if(c[r.Status]!=null)c[r.Status]++});return c}
+
+function renderDash(){
+    const y=$('fy').value,rows=y?D.filter(d=>String(d.TahunLulus)===y):D,c=cnt(rows),n=rows.length,f=rows.filter(done).length;
+    $('stat').innerHTML=`<div><b>${n}</b><span>Total alumni</span></div><div><b class="ok">${f}</b><span>Sudah diisi (${n?(f*100/n).toFixed(0):0}%)</span></div><div><b class="warn">${n-f}</b><span>Belum diisi</span></div>`+ST.map(s=>`<div><b>${c[s]}</b><span>${s}</span></div>`).join('');
+    $('bars').innerHTML=ST.map(s=>{const p=f?(c[s]*100/f):0;let x='';if(s===BB&&c[s]){const sc=SUB.map(u=>[u,rows.filter(r=>r.Status===BB&&r.Detail===u).length]).filter(a=>a[1]);x='<small>'+sc.map(a=>a[0]+': '+a[1]).join(' · ')+'</small>'}
+        return `<div>${s} — ${c[s]} (${p.toFixed(1)}%)<div class="bar" style="margin-bottom:${x?2:10}px"><i style="width:${p}%"></i></div>${x?'<div style="margin-bottom:10px">'+x+'</div>':''}</div>`}).join('');
+    const yrs=[...new Set(D.map(d=>d.TahunLulus))].sort((a,b)=>b-a);
+    $('rekap').innerHTML='<tr><th>Tahun</th>'+ST.map(s=>`<th>${s}</th>`).join('')+'<th>Belum</th><th>Total</th></tr>'+
+        yrs.map(yy=>{const r=D.filter(d=>d.TahunLulus===yy),k=cnt(r);return `<tr><td>${esc(yy)}</td>${ST.map(s=>`<td>${k[s]}</td>`).join('')}<td>${r.filter(d=>!done(d)).length}</td><td><b>${r.length}</b></td></tr>`}).join('');
+    renderRekap();renderCharts();
+    if(U.role==='admin'){
+        const sks=[...new Set(D.map(d=>d.Sekolah))].sort();
+        $('rekapSek').innerHTML='<tr><th>Sekolah</th><th>Total</th><th>Terisi</th><th>Progres</th></tr>'+sks.map(s=>{const r=D.filter(d=>d.Sekolah===s),t=r.filter(done).length,p=r.length?t*100/r.length:0;
+            return `<tr><td>${esc(s)}</td><td>${r.length}</td><td>${t}</td><td style="min-width:140px">${p.toFixed(0)}%<div class="bar" style="margin:2px 0 0"><i style="width:${p}%"></i></div></td></tr>`}).join('');
+    }
+}
+
+const norm=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+const nv=v=>(v===''||v==null||isNaN(v))?0:Number(v);
+const jml=r=>r.Jumlah!==''&&r.Jumlah!=null?nv(r.Jumlah):nv(r.L)+nv(r.P);
+function renderRekap(){
+    const adm=U.role==='admin',sel=$('rs');
+    if(adm){const sks=[...new Set(R.map(r=>r.Sekolah))].sort(),cur=sel.value;
+        if(sel.options.length!==sks.length+1){sel.innerHTML='<option value="">Semua sekolah</option>'+sks.map(s=>`<option>${esc(s)}</option>`).join('');sel.value=sks.includes(cur)?cur:''}}
+    const pick=adm?sel.value:'',rows=R.filter(r=>!pick||r.Sekolah===pick),note=$('rkNote');
+    if(!rows.length){$('rk').innerHTML='';$('rj').innerHTML='';$('rjT').textContent='';
+        note.textContent=adm?'Rekap lulusan belum diimpor. Gunakan tab Impor Excel (bagian 3).':'Rekap lulusan untuk sekolah ini belum tersedia. Hubungi admin dinas.';return}
+    const pnp=(rows[0]||{}).NPSN,al=D.filter(d=>!pick||((d.NPSN&&pnp)?String(d.NPSN)===String(pnp):norm(d.Sekolah)===norm(pick)));
+    const yrs=[...new Set(rows.map(r=>Number(r.Tahun)))].sort((a,b)=>a-b);
+    let tL=0,tP=0,tJ=0,tT=0,tF=0,html='';
+    yrs.forEach(y=>{const r=rows.filter(x=>Number(x.Tahun)===y),L=r.reduce((a,x)=>a+nv(x.L),0),P=r.reduce((a,x)=>a+nv(x.P),0),J=r.reduce((a,x)=>a+jml(x),0);
+        const a=al.filter(d=>Number(d.TahunLulus)===y),f=a.filter(done).length,pc=J?Math.min(100,f*100/J):0;
+        tL+=L;tP+=P;tJ+=J;tT+=a.length;tF+=f;
+        html+=`<tr><td>${y}</td><td>${L}</td><td>${P}</td><td><b>${J}</b></td><td>${a.length}</td><td>${f}</td><td style="min-width:120px">${pc.toFixed(0)}%<div class="bar" style="margin:2px 0 0"><i style="width:${pc}%"></i></div></td></tr>`});
+    const tp=tJ?Math.min(100,tF*100/tJ):0;
+    $('rk').innerHTML='<tr><th>Tahun lulus</th><th>L</th><th>P</th><th>Jumlah lulusan</th><th>Terdata di aplikasi</th><th>Status terisi</th><th>Progres</th></tr>'+html+
+        `<tr><td><b>Total</b></td><td><b>${tL}</b></td><td><b>${tP}</b></td><td><b>${tJ}</b></td><td><b>${tT}</b></td><td><b>${tF}</b></td><td><b>${tp.toFixed(0)}%</b></td></tr>`;
+    const byS=adm&&!pick,key=r=>byS?r.Sekolah:(r.Jurusan||'-'),keys=[...new Set(rows.map(key))].sort();
+    $('rjT').textContent=byS?'Jumlah lulusan per sekolah':'Rincian per jurusan';
+    $('rj').innerHTML=`<tr><th>${byS?'Sekolah':'Jurusan'}</th>${yrs.map(y=>`<th>${y}</th>`).join('')}<th>Total</th></tr>`+keys.map(k=>{
+        const cells=yrs.map(y=>rows.filter(r=>key(r)===k&&Number(r.Tahun)===y).reduce((a,r)=>a+jml(r),0));
+        return `<tr><td>${esc(k)}</td>${cells.map(c=>`<td>${c}</td>`).join('')}<td><b>${cells.reduce((a,b)=>a+b,0)}</b></td></tr>`}).join('');
+    const bad=rows.filter(r=>r.L!==''&&r.P!==''&&r.Jumlah!==''&&nv(r.L)+nv(r.P)!==nv(r.Jumlah)).length;
+    note.textContent=adm&&bad?`Perhatian: ${bad} baris rekap memiliki L+P yang tidak sama dengan Jumlah. Tabel memakai kolom Jumlah; mohon cek file sumber.`:'Sumber: rekap lulusan dari dinas. "Terdata" = siswa yang sudah ada di aplikasi; "Progres" = status terisi dibanding jumlah lulusan.';
+}
+let PG=1;
+function rt(){PG=1;renderTable()}
+function goPage(n){PG=Math.max(1,Number(n)||1);renderTable();$('pgT').scrollIntoView({block:'start'})}
+function goRow(n){goPage(Math.ceil((Number(n)||1)/(Number($('fps').value)||100)))}
+function filtered(){
+    const q=$('q').value.toLowerCase(),y=$('fy2').value,f=$('fs').value,sk=$('fsk').value;
+    return D.filter(d=>(!sk||d.Sekolah===sk)&&(!y||String(d.TahunLulus)===y)&&(!q||[d.Nama,d.NISN].join(' ').toLowerCase().includes(q))&&(!f||(f==='sudah')===done(d)));
+}
+function pagerHtml(total,size,pages,start){
+    const n=x=>x.toLocaleString('id-ID'),a=total?start+1:0,b=Math.min(total,start+size),off1=PG<=1?' disabled':'',off2=PG>=pages?' disabled':'';
+    return `<span>Baris <b>${n(a)}–${n(b)}</b> dari <b>${n(total)}</b></span>
+    <button class="g" onclick="goPage(1)"${off1}>«</button><button class="g" onclick="goPage(${PG-1})"${off1}>‹</button>
+    <span>Hal. <input type="number" min="1" max="${pages}" value="${PG}" onchange="goPage(this.value)"> / ${n(pages)}</span>
+    <button class="g" onclick="goPage(${PG+1})"${off2}>›</button><button class="g" onclick="goPage(${pages})"${off2}>»</button>
+    <span style="margin-left:8px">Ke baris <input type="number" min="1" max="${total}" placeholder="no." onchange="goRow(this.value)"></span>`;
+}
+function renderTable(){
+    const all=filtered(),adm=U.role==='admin',size=Number($('fps').value)||100,total=all.length,pages=Math.max(1,Math.ceil(total/size));
+    PG=Math.min(Math.max(1,PG),pages);const start=(PG-1)*size,r=all.slice(start,start+size),pg=pagerHtml(total,size,pages,start);
+    $('pgT').innerHTML=pg;$('pgB').innerHTML=pg;
+    $('tb').innerHTML='<tr><th>No.</th><th>Nama</th><th>Tahun</th><th style="min-width:130px">Status</th><th>Instansi</th><th>Keterangan</th><th></th></tr>'+
+    (r.map((d,i)=>{const p=PH[d.Status]||['Instansi','Keterangan'];return `<tr id="r_${esc(d.ID)}"><td data-l="No.">${start+i+1}</td><td data-l="" class="nm">${esc(d.Nama)}<br><small>${esc(d.NISN)}${adm?' · '+esc(d.Sekolah):''}</small></td><td data-l="Tahun lulus">${esc(d.TahunLulus)}</td>
+        <td data-l="Status"><select class="st" onchange="ph(this)"><option value="">— pilih —</option>${ST.map(s=>`<option${s===d.Status?' selected':''}>${s}</option>`).join('')}</select></td>
+        <td data-l="Instansi / lembaga"><input class="in" placeholder="${p[0]}" value="${esc(d.Instansi)}"${p[0]==='-'?' disabled':''}></td><td class="dtc" data-l="Keterangan">${dtCell(d.Status,d.Detail,p[1])}</td>
+        <td class="act" data-l="" style="white-space:nowrap"><button onclick="saveRow('${esc(d.ID)}')">Simpan</button> <button class="g" onclick="resetPw('${esc(d.ID)}')">Reset Sandi</button>${adm?` <button class="r" onclick="del('${esc(d.ID)}')">Hapus</button>`:''}</td></tr>`}).join('')||'<tr><td colspan="7">Tidak ada data yang cocok. Jika data siswa belum ada, admin perlu mengimpornya.</td></tr>');
+}
+function ph(sel){
+    const tr=sel.closest('tr'),p=PH[sel.value]||['Instansi','Keterangan'],inp=tr.querySelector('.in'),old=tr.querySelector('.dt').value;
+    inp.placeholder=p[0];inp.disabled=p[0]==='-';if(inp.disabled)inp.value='';
+    const keep=(sel.value===BB)===SUB.includes(old)?old:'';
+    tr.querySelector('.dtc').innerHTML=dtCell(sel.value,keep,p[1]);
+}
+async function saveRow(id){
+    const tr=$('r_'+id),btn=tr.querySelector('button');btn.textContent='...';
+    try{await call('updateStatus',T,id,tr.querySelector('.st').value,tr.querySelector('.in').value.trim(),tr.querySelector('.dt').value.trim(),(D.find(x=>x.ID===id)||{})._r);
+        const d=D.find(x=>x.ID===id);d.Status=tr.querySelector('.st').value;d.Instansi=tr.querySelector('.in').value.trim();d.Detail=tr.querySelector('.dt').value.trim();
+        btn.textContent='✓ Tersimpan';setTimeout(()=>btn.textContent='Simpan',1500);renderDash();
+    }catch(e){btn.textContent='Simpan';alert(e.message)}
+}
+async function del(id){if(!confirm('Hapus data ini?'))return;try{await call('deleteAlumni',T,id);await load()}catch(e){alert(e.message)}}
+
+function fillSaya(){
+    const d=D[0];if(!d){$('sNama').textContent='Data Anda tidak ditemukan. Hubungi operator sekolah.';return}
+    $('sNama').textContent=d.Nama;$('sInfo').textContent=`NISN ${d.NISN} · ${d.Sekolah} · Lulus ${d.TahunLulus}`;
+    $('ss').innerHTML='<option value="">— pilih —</option>'+ST.map(x=>`<option${x===d.Status?' selected':''}>${x}</option>`).join('');
+    $('si').value=d.Instansi||'';$('sk2').value=d.Kota||'';$('st2').value=d.Telepon||'';
+    phS(d.Detail||'');$('pwBan').classList.toggle('hide',!U.defaultPw);
+}
+function phS(keep){
+    const st=$('ss').value,p=PH[st]||['Instansi / lembaga','Keterangan'],inp=$('si');
+    $('sli').textContent=p[0]==='-'?'Instansi (tidak perlu diisi)':p[0];$('sld').textContent=p[1];
+    inp.disabled=p[0]==='-';if(inp.disabled)inp.value='';
+    const old=keep!==undefined?keep:(($('sdw').querySelector('.dt')||{}).value||'');
+    $('sdw').innerHTML=dtCell(st,(st===BB)===SUB.includes(old)?old:'','');
+}
+async function saveSaya(){
+    const m=$('sm');m.className='';m.textContent='Menyimpan...';
+    try{await call('simpanSaya',T,$('ss').value,$('si').value.trim(),$('sdw').querySelector('.dt').value.trim(),$('sk2').value.trim(),$('st2').value.trim());
+        m.className='ok';m.textContent='Terima kasih, data Anda sudah tersimpan.'}
+    catch(e){m.className='warn';m.textContent=e.message}
+}
+async function savePw(){
+    const m=$('pm'),a=$('pl').value,b=$('pb').value;m.className='warn';
+    if(b.length<6){m.textContent='Password baru minimal 6 karakter.';return}
+    if(b!==$('pb2').value){m.textContent='Ulangi password baru belum sama.';return}
+    m.textContent='Menyimpan...';
+    try{await call('gantiSandi',T,a,b);U.defaultPw=false;ls.set('ts_u',JSON.stringify(U));$('pwBan').classList.add('hide');
+        ['pl','pb','pb2'].forEach(i=>$(i).value='');m.className='ok';m.textContent='Password berhasil diganti.'}
+    catch(e){m.textContent=e.message}
+}
+async function resetPw(id){
+    if(!confirm('Kembalikan password alumni ini menjadi NISN?'))return;
+    try{await call('resetSandi',T,id);alert('Password dikembalikan ke NISN.')}catch(e){alert(e.message)}
+}
+let OPS=[];
+async function loadOps(){try{OPS=await call('listOperator',T);renderOps()}catch(e){$('oMsg').className='warn';$('oMsg').textContent=e.message}}
+function renderOps(){
+    const q=$('oQ').value.toLowerCase(),r=OPS.filter(o=>!q||(o.Username+' '+o.Sekolah).toLowerCase().includes(q));
+    $('ot').innerHTML='<tr><th>Username</th><th>Sekolah</th><th>NPSN</th><th>Peran</th><th>Status</th><th></th></tr>'+(r.map(o=>`<tr><td data-l="Username" class="nm">${esc(o.Username)}</td><td data-l="Sekolah">${esc(o.Sekolah)}</td><td data-l="NPSN">${o.NPSN?esc(o.NPSN):'<small>kosong</small>'}</td><td data-l="Peran">${esc(o.Role)}</td><td data-l="Status">${o.Aktif?'<span class="ok">Aktif</span>':'<span class="err">Nonaktif</span>'}</td>
+        <td class="act" data-l="" style="white-space:nowrap"><button class="g" data-u="${esc(o.Username)}" onclick="opReset(this.dataset.u)">Reset Sandi</button> <button class="${o.Aktif?'r':''}" data-u="${esc(o.Username)}" onclick="opToggle(this.dataset.u,${!o.Aktif})">${o.Aktif?'Nonaktifkan':'Aktifkan'}</button></td></tr>`).join('')||'<tr><td colspan="6">Belum ada akun.</td></tr>');
+}
+async function opAdd(){
+    const m=$('oM');m.className='';m.textContent='Menyimpan...';
+    try{await call('opTambah',T,$('oU').value,$('oP').value,$('oS').value,$('oN').value);['oU','oP','oS','oN'].forEach(i=>$(i).value='');m.className='ok';m.textContent='Akun operator ditambahkan.';loadOps()}
+    catch(e){m.className='err';m.textContent=e.message}
+}
+async function opReset(u){
+    if(!confirm('Buat password acak baru untuk "'+u+'"? Password lama tidak berlaku lagi.'))return;
+    try{const r=await call('opResetSandi',T,u,'');$('oMsg').className='';$('oMsg').innerHTML=`Password baru untuk <b>${esc(u)}</b>: <code style="background:#eef2ff;padding:2px 6px;border-radius:4px;font-size:15px">${esc(r.password)}</code> — catat dan sampaikan ke operator. Password ini tidak ditampilkan lagi.`}
+    catch(e){$('oMsg').className='err';$('oMsg').textContent=e.message}
+}
+async function opToggle(u,aktif){
+    if(!confirm((aktif?'Aktifkan':'Nonaktifkan')+' akun "'+u+'"?'+(aktif?'':' Operator tidak bisa login dan sesinya langsung berakhir.')))return;
+    try{await call('opSetAktif',T,u,aktif);$('oMsg').textContent='';loadOps()}catch(e){$('oMsg').className='err';$('oMsg').textContent=e.message}
+}
+async function doNpsn(){
+    const m=$('nM');m.className='';m.textContent='Memproses...';
+    try{const r=await call('lengkapiNpsn',T);
+        m.className='ok';m.innerHTML=`NPSN terisi: <b>${r.alumni}</b> data siswa, <b>${r.operator}</b> akun operator.`+(r.ambigu?` <span class="warn">${r.ambigu} nama sekolah punya lebih dari satu NPSN dan dilewati.</span>`:'')+
+            (r.tanpaNpsn.length?`<p class="warn" style="margin:6px 0 0">Sekolah yang belum ketemu NPSN-nya (${r.tanpaNpsn.length}), kemungkinan ejaan berbeda atau belum ada di rekap: ${r.tanpaNpsn.slice(0,20).map(esc).join(', ')}${r.tanpaNpsn.length>20?', …':''}</p>`:'<p style="margin:6px 0 0">Semua sekolah sudah punya NPSN.</p>');
+        load();loadOps()}
+    catch(e){m.className='err';m.textContent=e.message}
+}
+const COL=['#2563eb','#16a34a','#f59e0b','#8b5cf6','#ef4444','#64748b'];
+function donut(c,f){
+    const r=62,C=2*Math.PI*r;let off=0;
+    const arcs=f?ST.map((s,i)=>{const len=C*c[s]/f,a=`<circle cx="80" cy="80" r="${r}" fill="none" stroke="${COL[i]}" stroke-width="26" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 80 80)"><title>${esc(s)}: ${c[s]}</title></circle>`;off+=len;return a}).join(''):'<circle cx="80" cy="80" r="62" fill="none" stroke="#e5e7eb" stroke-width="26"/>';
+    const leg=ST.map((s,i)=>`<div class="lg2"><i style="background:${COL[i]}"></i><span>${esc(s)}</span><b>${c[s]}</b><small>${f?(c[s]*100/f).toFixed(1):'0.0'}%</small></div>`).join('');
+    return `<div class="dn"><svg viewBox="0 0 160 160" width="170" height="170"><g>${arcs}</g><text x="80" y="78" text-anchor="middle" font-size="26" font-weight="700" fill="#1f2937">${f}</text><text x="80" y="97" text-anchor="middle" font-size="11" fill="#6b7280">sudah mengisi</text></svg><div class="leg">${leg}</div></div>`;
+}
+function stackYear(rows){
+    const yrs=[...new Set(rows.map(d=>Number(d.TahunLulus)))].sort((a,b)=>a-b);
+    return yrs.map(y=>{const r=rows.filter(d=>Number(d.TahunLulus)===y),c=cnt(r),f=r.filter(done).length;
+        return `<div class="sy"><span>${y}</span><div class="sb">${f?ST.map((s,i)=>c[s]?`<i style="width:${c[s]*100/f}%;background:${COL[i]}" title="${esc(s)}: ${c[s]}"></i>`:'').join(''):'<em>belum ada yang mengisi</em>'}</div><small>${f}/${r.length}</small></div>`}).join('')||'<small>Belum ada data.</small>';
+}
+function renderCharts(){
+    const y=$('fy').value,rows=y?D.filter(d=>String(d.TahunLulus)===y):D;
+    $('chDonut').innerHTML=donut(cnt(rows),rows.filter(done).length);$('chYear').innerHTML=stackYear(D);
+}
+
+// ---- Laporan ----
+function sameSek(a,b){return (a.NPSN&&b.NPSN)?String(a.NPSN)===String(b.NPSN):norm(a.Sekolah)===norm(b.Sekolah)}
+function fillLap(){
+    if(U.role==='alumni')return;
+    const yrs=[...new Set(D.map(d=>Number(d.TahunLulus)).concat(R.map(r=>Number(r.Tahun))))].filter(Boolean).sort((a,b)=>b-a),cy=$('lyr').value;
+    $('lyr').innerHTML='<option value="">Semua tahun</option>'+yrs.map(y=>`<option>${y}</option>`).join('');$('lyr').value=yrs.map(String).includes(cy)?cy:'';
+    if(U.role==='admin'){const sks=[...new Set(D.map(d=>d.Sekolah).concat(R.map(r=>r.Sekolah)))].filter(Boolean).sort(),cs=$('lsk').value;
+        $('lsk').innerHTML='<option value="">Semua sekolah</option>'+sks.map(x=>`<option>${esc(x)}</option>`).join('');$('lsk').value=sks.includes(cs)?cs:''}
+    if(!$('v7').classList.contains('hide'))renderLaporan();
+}
+function lapModel(){
+    const adm=U.role==='admin',y=$('lyr').value,sk=adm?$('lsk').value:'';
+    const sample=sk?(D.find(d=>d.Sekolah===sk)||R.find(r=>r.Sekolah===sk)):null;
+    const al=D.filter(d=>(!sample||sameSek(d,sample))&&(!y||String(d.TahunLulus)===y));
+    const rk=R.filter(r=>(!sample||sameSek(r,sample))&&(!y||String(r.Tahun)===y));
+    const c=cnt(al),f=al.filter(done).length,lul=rk.reduce((a,r)=>a+jml(r),0);
+    const years=[...new Set(al.map(d=>Number(d.TahunLulus)).concat(rk.map(r=>Number(r.Tahun))))].filter(Boolean).sort((a,b)=>a-b);
+    const perYear=years.map(yy=>{const a=al.filter(d=>Number(d.TahunLulus)===yy);return {y:yy,lulusan:rk.filter(r=>Number(r.Tahun)===yy).reduce((s,r)=>s+jml(r),0),terdata:a.length,terisi:a.filter(done).length,c:cnt(a)}});
+    let perSek=null;
+    if(adm&&!sk){const key=x=>x.NPSN?'P'+x.NPSN:'N'+norm(x.Sekolah),g={};
+        al.forEach(d=>{(g[key(d)]=g[key(d)]||{Sekolah:d.Sekolah,NPSN:d.NPSN,a:[],lul:0}).a.push(d)});
+        rk.forEach(r=>{(g[key(r)]=g[key(r)]||{Sekolah:r.Sekolah,NPSN:r.NPSN,a:[],lul:0}).lul+=jml(r)});
+        perSek=Object.values(g).sort((p,q)=>String(p.Sekolah).localeCompare(String(q.Sekolah))).map(o=>({Sekolah:o.Sekolah,NPSN:o.NPSN,lulusan:o.lul,terdata:o.a.length,terisi:o.a.filter(done).length,c:cnt(o.a)}))}
+    const bb=SUB.map(u=>[u,al.filter(d=>d.Status===BB&&d.Detail===u).length]);
+    return {adm,y,sk,al,c,f,lul,perYear,perSek,bb,hasRekap:R.length>0,
+        scope:adm?(sk||'Semua Sekolah (Kabupaten Gunungkidul)'):U.sekolah,per:y?'Tahun lulus '+y:'Semua tahun lulus',
+        tgl:new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})};
+}
+function renderLaporan(){
+    if(!U||U.role==='alumni')return;
+    const m=lapModel(),n=x=>Number(x).toLocaleString('id-ID'),pct=(a,b)=>b?(a*100/b).toFixed(1)+'%':'-',base=m.lul||m.al.length;
+    const th=ST.map(s=>`<th>${esc(s)}</th>`).join('');
+    let h=`<div><div style="font-size:12px;letter-spacing:.08em;color:var(--m)">LAPORAN</div><h2 style="margin:2px 0 0;font-size:20px;color:#0a2463">Tracer Study Jenjang SMA Kab. Gunungkidul</h2><div style="font-weight:600;margin-top:4px">${esc(m.scope)}</div><div style="font-size:13px;color:var(--m)">${m.per} · Dicetak ${m.tgl} oleh ${esc(U.username)}</div></div>`;
+    h+=`<div class="stat" style="margin:14px 0"><div><b>${m.hasRekap?n(m.lul):'-'}</b><span>Jumlah lulusan (rekap dinas)</span></div><div><b>${n(m.al.length)}</b><span>Terdata di aplikasi</span></div><div><b class="ok">${n(m.f)}</b><span>Sudah mengisi (${pct(m.f,base)} dari ${m.lul?'lulusan':'terdata'})</span></div><div><b class="warn">${n(m.al.length-m.f)}</b><span>Belum mengisi</span></div></div>`;
+    h+=`<h3 class="lt3">Distribusi status alumni</h3>${donut(m.c,m.f)}`;
+    if(m.bb.some(x=>x[1]))h+=`<div style="font-size:13px;margin-top:6px"><b>Rincian Belum Bekerja:</b> ${m.bb.filter(x=>x[1]).map(x=>esc(x[0])+' ('+x[1]+')').join(' · ')}</div>`;
+    h+=`<h3 class="lt3">Per tahun lulus</h3><div class="cols"><div>${stackYear(m.al)}</div><div></div></div><div class="sc" style="margin-top:8px"><table class="lt"><tr><th>Tahun</th><th>Lulusan (rekap)</th><th>Terdata</th><th>Sudah mengisi</th><th>Progres</th>${th}</tr>`+
+        (m.perYear.map(r=>`<tr><td>${r.y}</td><td class="n">${m.hasRekap?n(r.lulusan):'-'}</td><td class="n">${n(r.terdata)}</td><td class="n">${n(r.terisi)}</td><td class="n">${pct(r.terisi,r.lulusan||r.terdata)}</td>${ST.map(s=>`<td class="n">${r.c[s]}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="11">Belum ada data.</td></tr>')+`</table></div>`;
+    if(m.perSek)h+=`<h3 class="lt3">Per sekolah</h3><div class="sc"><table class="lt"><tr><th>Sekolah</th><th>Lulusan (rekap)</th><th>Terdata</th><th>Sudah mengisi</th><th>Progres</th>${th}</tr>`+
+        m.perSek.map(r=>`<tr><td>${esc(r.Sekolah)}</td><td class="n">${m.hasRekap?n(r.lulusan):'-'}</td><td class="n">${n(r.terdata)}</td><td class="n">${n(r.terisi)}</td><td class="n">${pct(r.terisi,r.lulusan||r.terdata)}</td>${ST.map(s=>`<td class="n">${r.c[s]}</td>`).join('')}</tr>`).join('')+`</table></div>`;
+    h+=`<p style="font-size:11px;color:var(--m);margin-top:14px">Catatan: persentase pada grafik status dihitung dari alumni yang sudah mengisi. "Progres" adalah alumni yang sudah mengisi dibanding jumlah lulusan menurut rekap dinas (atau jumlah terdata bila rekap belum ada).</p>`;
+    $('lap').innerHTML=h;
+}
+function cetak(){document.body.classList.add('pr');try{window.print()}finally{setTimeout(()=>document.body.classList.remove('pr'),800)}}
+function exportXlsx(){
+    if(typeof XLSX==='undefined'){alert('Pustaka Excel belum termuat. Periksa koneksi internet lalu muat ulang halaman.');return}
+    const m=lapModel(),wb=XLSX.utils.book_new(),pc=(a,b)=>b?+(a*100/b).toFixed(1):0;
+    const add=(name,aoa,w)=>{const ws=XLSX.utils.aoa_to_sheet(aoa);if(w)ws['!cols']=w.map(x=>({wch:x}));XLSX.utils.book_append_sheet(wb,ws,name)};
+    add('Ringkasan',[['Laporan Tracer Study Jenjang SMA Kab. Gunungkidul'],[m.scope],[m.per],['Dicetak '+m.tgl+' oleh '+U.username],[],
+        ['Jumlah lulusan (rekap dinas)',m.hasRekap?m.lul:'-'],['Terdata di aplikasi',m.al.length],['Sudah mengisi',m.f],['Belum mengisi',m.al.length-m.f],[],
+        ['Status','Jumlah','% dari yang sudah mengisi']].concat(ST.map(s=>[s,m.c[s],pc(m.c[s],m.f)])).concat([[],['Rincian Belum Bekerja','Jumlah']]).concat(m.bb),[44,16,26]);
+    add('Per Tahun',[['Tahun lulus','Jumlah lulusan (rekap)','Terdata','Sudah mengisi','Belum mengisi','Progres (%)'].concat(ST)].concat(m.perYear.map(r=>[r.y,m.hasRekap?r.lulusan:'-',r.terdata,r.terisi,r.terdata-r.terisi,pc(r.terisi,r.lulusan||r.terdata)].concat(ST.map(s=>r.c[s])))),[12,22,10,14,14,12,22,12,14,36,16,16]);
+    if(m.perSek)add('Per Sekolah',[['Sekolah','NPSN','Jumlah lulusan (rekap)','Terdata','Sudah mengisi','Progres (%)'].concat(ST)].concat(m.perSek.map(r=>[r.Sekolah,String(r.NPSN||''),m.hasRekap?r.lulusan:'-',r.terdata,r.terisi,pc(r.terisi,r.lulusan||r.terdata)].concat(ST.map(s=>r.c[s])))),[40,12,22,10,14,12,22,12,14,36,16,16]);
+    const al=m.al.slice().sort((a,b)=>String(a.Sekolah).localeCompare(String(b.Sekolah))||String(a.Nama).localeCompare(String(b.Nama)));
+    add('Daftar Alumni',[['Sekolah','NPSN','Tahun lulus','NISN','Nama','JK','Status','Instansi','Keterangan','Kota','No. HP']].concat(al.map(d=>[d.Sekolah,String(d.NPSN||''),d.TahunLulus,String(d.NISN||''),d.Nama,d.JK,d.Status||'(belum diisi)',d.Instansi||'',d.Detail||'',d.Kota||'',String(d.Telepon||'')])),[36,11,11,13,32,5,36,28,30,16,16]);
+    const out=XLSX.write(wb,{type:'array',bookType:'xlsx'}),a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    a.download='laporan-tracer-study-'+m.scope.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)+'-'+(m.y||'semua-tahun')+'.xlsx';a.click();
+}
+function exportCsv(){
+    const cols=['Sekolah','TahunLulus','NISN','Nama','JK','Status','Instansi','Detail','Kota','Telepon'];
+    const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const csv=[cols.join(',')].concat(filtered().map(d=>cols.map(c=>q(d[c])).join(','))).join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download='tracer-study.csv';a.click();
+}
+
+// ---- Impor Excel ----
+const MAP2={jenjang:'Jenjang',namasekolah:'Sekolah',sekolah:'Sekolah',npsn:'NPSN',programkeahlianjurusan:'Jurusan',jurusan:'Jurusan',tahun:'Tahun',llakilaki:'L',l:'L',pperempuan:'P',p:'P',jumlah:'Jumlah'};
+const MAP={namasekolah:'Sekolah',npsn:'NPSN',sekolah:'Sekolah',tahunlulus:'TahunLulus',tahun:'TahunLulus',nisn:'NISN',nama:'Nama',namasiswa:'Nama',jk:'JK',jeniskelamin:'JK',kota:'Kota',telepon:'Telepon',hp:'Telepon',nohp:'Telepon',username:'Username',password:'Password'};
+function readFile(f,MP){MP=MP||MAP;return new Promise((ok,no)=>{const r=new FileReader(),csv=/\.csv$/i.test(f.name);r.onerror=no;r.onload=e=>{try{
+    const wb=XLSX.read(e.target.result,{type:csv?'string':'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false,blankrows:true});
+    ok(rows.map((o,i)=>{const n={_n:i+2};for(const k in o){const m=MP[k.toLowerCase().replace(/[^a-z]/g,'')];if(m)n[m]=String(o[k]).trim()}return n}).filter(n=>Object.keys(n).some(k=>k!=='_n'&&n[k]!=='')))
+    }catch(x){no(x)}};csv?r.readAsText(f,'UTF-8'):r.readAsArrayBuffer(f)})}
+const PEND={},REP={},RJ={A:'importAlumni',O:'importOperator',R:'importRekap'},REQ={A:['Sekolah','TahunLulus','Nama'],O:['Username','Password','Sekolah'],R:['Sekolah','Tahun']};
+const NK=x=>String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+function impReset(k){delete PEND[k];$('b'+k).disabled=true;$('m'+k).textContent='';$('l'+k).innerHTML=''}
+function clientDup(k,rows){
+    const seen={},out=[];
+    rows.forEach(r=>{let key;
+        if(k==='A'){const d=String(r.NISN||'').replace(/\D/g,'');key=d?'N|'+('0000000000'+d).slice(-10):'X|'+NK(r.Sekolah)+'|'+r.TahunLulus+'|'+NK(r.Nama)}
+        else if(k==='O')key=String(r.Username||'').trim().toLowerCase();
+        else return;
+        if(!key)return;
+        if(seen[key])out.push({n:r._n,alasan:`Duplikat di dalam file (sama dengan baris ${seen[key]})`,info:(r.Nama||r.Username||'')+(r.Sekolah?' — '+r.Sekolah:'')});
+        else seen[key]=r._n});
+    return out;
+}
+async function imp(k,dry){
+    const f=$('f'+k).files[0],m=$('m'+k);m.className='';
+    if(!dry&&!PEND[k]){m.className='warn';m.textContent='Klik "Periksa file" dulu.';return}
+    if(dry&&!f){m.className='warn';m.textContent='Pilih file dulu.';return}
+    try{
+        let rows;
+        if(dry){m.textContent='Membaca file...';rows=await readFile(f,k==='R'?MAP2:MAP);
+            if(!rows.length)throw new Error('File kosong atau judul kolom tidak dikenali. Gunakan template.');
+            const miss=REQ[k].filter(c=>!rows.some(r=>r[c]));
+            if(miss.length)throw new Error('Kolom wajib tidak ditemukan atau kosong: '+miss.join(', ')+'. Periksa judul kolom (lihat template).');
+        }else rows=PEND[k].rows;
+        const rep={tambah:0,masalah:[],peringatan:[],tanpaOp:new Set()};
+        for(let i=0;i<rows.length;i+=300){m.textContent=(dry?'Memeriksa ':'Mengimpor ')+Math.min(i+300,rows.length)+' / '+rows.length+'...';
+            const r=await call(RJ[k],T,rows.slice(i,i+300),i===0,!!dry);
+            rep.tambah+=r.tambah;rep.masalah.push(...r.masalah);rep.peringatan.push(...r.peringatan);(r.tanpaOperator||[]).forEach(x=>rep.tanpaOp.add(x))}
+        if(dry){const rej=new Set(rep.masalah.map(x=>x.n));
+            clientDup(k,rows).forEach(x=>{rep.masalah.push(x);if(!rej.has(x.n))rep.tambah--});PEND[k]={rows}}
+        showRep(k,rep,dry);
+        if(dry)$('b'+k).disabled=rep.tambah<=0;
+        else{delete PEND[k];$('b'+k).disabled=true;$('f'+k).value='';if(k==='A'||k==='R')load()}
+    }catch(e){m.className='warn';m.textContent='Gagal: '+(e.message||e)}
+}
+function showRep(k,rep,dry){
+    const m=$('m'+k),l=$('l'+k);
+    const all=rep.masalah.map(x=>({...x,j:'Ditolak'})).concat(rep.peringatan.map(x=>({...x,j:'Peringatan'}))).sort((a,b)=>(a.n||0)-(b.n||0));REP[k]=all;
+    m.className=rep.tambah>0?'ok':'warn';
+    m.innerHTML=`<b>${rep.tambah.toLocaleString('id-ID')}</b> baris ${dry?'siap ditambahkan':'berhasil ditambahkan'} · <b>${rep.masalah.length.toLocaleString('id-ID')}</b> ditolak · <b>${rep.peringatan.length.toLocaleString('id-ID')}</b> peringatan`+(dry?(rep.tambah>0?'. Jika sudah sesuai, klik <b>Impor sekarang</b>.':'. Tidak ada baris yang bisa diimpor.'):'.');
+    let h='';
+    if(rep.tanpaOp.size)h+=`<p class="warn" style="font-size:13px">Sekolah di file ini yang belum punya akun operator (${rep.tanpaOp.size}): ${[...rep.tanpaOp].slice(0,15).map(esc).join(', ')}${rep.tanpaOp.size>15?', …':''}</p>`;
+    if(all.length)h+=`<table style="margin-top:8px"><tr><th>Baris</th><th>Jenis</th><th>Alasan</th><th>Data</th></tr>`+all.slice(0,100).map(x=>`<tr><td>${esc(x.n)}</td><td class="${x.j==='Ditolak'?'err':'warn'}">${x.j}</td><td>${esc(x.alasan)}</td><td>${esc(x.info)}</td></tr>`).join('')+`</table><div style="font-size:12px;margin:6px 0">${all.length>100?`Menampilkan 100 dari ${all.length}. `:''}<button class="g" onclick="dlRep('${k}')">Unduh laporan lengkap (CSV)</button></div>`;
+    l.innerHTML=h;
+}
+function dlRep(k){const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const csv=['Baris,Jenis,Alasan,Data'].concat((REP[k]||[]).map(x=>[x.n,x.j,x.alasan,x.info].map(q).join(','))).join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download='laporan-impor-'+k+'.csv';a.click()}
+function tpl(k){
+    const csv={A:'Sekolah,NPSN,TahunLulus,NISN,Nama,JK,Kota,Telepon\nSMAN 1 Contoh,20400000,2025,0012345678,Budi Santoso,L,Yogyakarta,\n',O:'Username,Password,Sekolah,NPSN\nsman1contoh,GantiPassword123,SMAN 1 Contoh,20400000\n',R:'Jenjang,Nama Sekolah,NPSN,Program Keahlian/Jurusan,Tahun,L (Laki-laki),P (Perempuan),Jumlah\nSMA,SMAN 1 Contoh,20400000,MIPA,2025,20,50,70\n'}[k];
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download={A:'template-siswa.csv',O:'template-operator.csv',R:'template-rekap-lulusan.csv'}[k];a.click();
+}
+</script>
+</body>
+</html>
