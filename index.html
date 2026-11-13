@@ -276,10 +276,10 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;borde
             <div class="card"><b id="sNama" style="font-size:17px"></b><div id="sInfo" style="font-size:13px;color:var(--m);margin-top:4px"></div></div>
             <div class="card hide" id="pwBan" style="background:#fffbeb;border-color:#fcd34d;font-size:13px">Password Anda saat ini masih sama dengan NISN. Demi keamanan, silakan ganti lewat tombol <b>Ganti Password</b> di kanan atas.</div>
             <div class="card">
-                <b>Apa kegiatan Anda setelah lulus?</b>
+                <b>Status Anda Setelah Lulus</b>
                 <div class="row" style="margin-top:10px"><div style="flex:2"><label>Status *</label><select id="ss" onchange="phS()"></select></div></div>
                 <div class="row"><div><label id="sli">Instansi / lembaga</label><input id="si"></div><div><label id="sld">Keterangan</label><div id="sdw"></div></div></div>
-                <div class="row"><div><label>Kota domisili</label><input id="sk2"></div><div><label>No. HP / WhatsApp</label><input id="st2" inputmode="tel"></div></div>
+                <div class="row"><div><label>Domisili</label><select id="sdm"><option value="">— pilih —</option><option>Dalam DIY</option><option>Luar DIY</option></select></div><div><label>Kota domisili</label><input id="sk2"></div><div><label>No. HP / WhatsApp</label><input id="st2" inputmode="tel"></div></div>
                 <div class="row"><button onclick="saveSaya()">Simpan</button></div>
                 <div id="sm" style="font-size:13px"></div>
             </div>
@@ -458,7 +458,7 @@ function fillSaya(){
     const d=D[0];if(!d){$('sNama').textContent='Data Anda tidak ditemukan. Hubungi operator sekolah.';return}
     $('sNama').textContent=d.Nama;$('sInfo').textContent=`NISN ${d.NISN} · ${d.Sekolah} · Lulus ${d.TahunLulus}`;
     $('ss').innerHTML='<option value="">— pilih —</option>'+ST.map(x=>`<option${x===d.Status?' selected':''}>${x}</option>`).join('');
-    $('si').value=d.Instansi||'';$('sk2').value=d.Kota||'';$('st2').value=d.Telepon||'';
+    $('si').value=d.Instansi||'';$('sdm').value=d.Domisili||'';$('sk2').value=d.Kota||'';$('st2').value=d.Telepon||'';
     phS(d.Detail||'');$('pwBan').classList.toggle('hide',!U.defaultPw);
 }
 function phS(keep){
@@ -470,7 +470,7 @@ function phS(keep){
 }
 async function saveSaya(){
     const m=$('sm');m.className='';m.textContent='Menyimpan...';
-    try{await call('simpanSaya',T,$('ss').value,$('si').value.trim(),$('sdw').querySelector('.dt').value.trim(),$('sk2').value.trim(),$('st2').value.trim());
+    try{await call('simpanSaya',T,$('ss').value,$('si').value.trim(),$('sdw').querySelector('.dt').value.trim(),$('sk2').value.trim(),$('st2').value.trim(),$('sdm').value);
         m.className='ok';m.textContent='Terima kasih, data Anda sudah tersimpan.'}
     catch(e){m.className='warn';m.textContent=e.message}
 }
