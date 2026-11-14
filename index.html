@@ -81,6 +81,9 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;borde
 .lg{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:70px 20px 20px;background:linear-gradient(135deg,#0a2463 0%,#1a56db 55%,#0e9fa8 100%)}
 .lg .bg{position:absolute;inset:0;width:100%;height:100%}.bg.port{display:none}@media (max-aspect-ratio:1/1){.bg.land{display:none}.bg.port{display:block}}
 .trace{stroke-dasharray:3 11;animation:dash 40s linear infinite}
+tr.chg td{background:#fffbeb}tr.bad td{background:#fee2e2}tr.okk td{background:#dcfce7}
+.savebar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--c);border:1px solid var(--l);border-radius:10px;padding:8px 12px;margin:8px 0;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+.savebar #pcT{flex:1 1 220px;font-size:13.5px}
 @keyframes spin{to{transform:rotate(360deg)}}
 #ld{position:fixed;inset:0;background:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;z-index:9999}
 #ld .ldb{background:var(--c);border-radius:16px;padding:20px 28px;box-shadow:0 10px 30px rgba(0,0,0,.2);text-align:center;font-size:14px;color:var(--t);max-width:86vw}
@@ -237,10 +240,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;borde
                     <div style="max-width:150px"><label>Baris per halaman</label><select id="fps" onchange="rt()"><option>50</option><option selected>100</option><option>200</option><option>300</option></select></div>
                     <button class="g" onclick="exportCsv()">Unduh CSV</button>
                 </div>
+                <div class="savebar no-print"><span id="pcT" style="color:var(--m)">Belum ada perubahan.</span><button class="g" id="btnDisc" disabled onclick="discardAll()">Batalkan perubahan</button><button id="btnSaveAll" disabled onclick="saveAll()">Simpan semua perubahan</button></div>
                 <div class="pager" id="pgT"></div>
                 <div class="sc"><table id="tb" class="rt"></table></div>
                 <div class="pager" id="pgB"></div>
-                <small>Isian yang belum ditekan <b>Simpan</b> akan hilang saat pindah halaman atau mengubah filter.</small>
+                <small>Ubah status/domisili di beberapa baris (ditandai warna kuning), lalu klik <b>Simpan semua perubahan</b>. Perubahan tetap tertahan saat pindah halaman atau mengubah filter, tetapi hilang bila halaman ditutup/dimuat ulang sebelum disimpan.</small>
             </div>
         </section>
 
@@ -346,7 +350,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const once=(fn,a)=>new Promise((ok,no)=>google.script.run.withSuccessHandler(ok).withFailureHandler(no)[fn](...a));
 const TRANSIENT=/SERVER_SIBUK|lock timeout|could not obtain lock|simultan|bersamaan|too many (scripts|simultaneous|invocations)|invoked too many|terlalu banyak (skrip|script)|unavailable|tidak tersedia|temporar|time.?out|network|jaringan|failed to fetch|server error/i;
 function busy(m){if(m)$('ldt').textContent=m}
-const LMSG={login:'Sedang masuk...',getAlumni:'Mengambil data alumni...',getRekap:'Mengambil data rekap...',updateStatus:'Menyimpan data...',simpanSaya:'Menyimpan data...',importAlumni:'Memproses impor...',importOperator:'Memproses impor...',importRekap:'Memproses impor...',importStatus:'Memproses impor...',gantiSandi:'Menyimpan password...',resetSandi:'Mereset password...',deleteAlumni:'Menghapus data...',listOperator:'Mengambil data operator...',opTambah:'Menyimpan data...',opSetAktif:'Menyimpan data...',opResetSandi:'Menyimpan password...',lengkapiNpsn:'Memproses data...'};
+const LMSG={login:'Sedang masuk...',getAlumni:'Mengambil data alumni...',getRekap:'Mengambil data rekap...',updateStatus:'Menyimpan data...',updateStatusBatch:'Menyimpan perubahan...',simpanSaya:'Menyimpan data...',importAlumni:'Memproses impor...',importOperator:'Memproses impor...',importRekap:'Memproses impor...',importStatus:'Memproses impor...',gantiSandi:'Menyimpan password...',resetSandi:'Mereset password...',deleteAlumni:'Menghapus data...',listOperator:'Mengambil data operator...',opTambah:'Menyimpan data...',opSetAktif:'Menyimpan data...',opResetSandi:'Menyimpan password...',lengkapiNpsn:'Memproses data...'};
 let LD=0;
 function loader(on,msg){LD=Math.max(0,LD+(on?1:-1));$('ld').classList.toggle('hide',LD===0);if(on)$('ldt').textContent=msg||'Memproses...'}
 async function call(fn,...a){
@@ -398,7 +402,7 @@ async function doLogin(){
     catch(e){$('msg').textContent=e.message||'Login gagal, coba lagi.'}
     bl.disabled=false;bl.textContent='Masuk';
 }
-function doLogout(){
+function doLogout(){Object.keys(PCH).forEach(k=>delete PCH[k]);
     PRE=null;busy('');
     if(T)call('logout',T).catch(()=>{});
     T='';U=null;D=[];R=[];ls.del('ts_t');ls.del('ts_u');
@@ -422,7 +426,8 @@ async function load(){
     const a=$('fy').value,b=$('fy2').value;$('fy').innerHTML=opt;$('fy2').innerHTML=opt;$('fy').value=a;$('fy2').value=b;
     const sks=[...new Set(D.map(d=>d.Sekolah))].sort(),cs=$('fsk').value;
     $('fsk').innerHTML='<option value="">Semua sekolah</option>'+sks.map(x=>`<option>${esc(x)}</option>`).join('');$('fsk').value=sks.includes(cs)?cs:'';
-    fillLap();renderDash();renderTable();
+    Object.keys(PCH).forEach(id=>{const d=D.find(x=>x.ID===id),p=PCH[id];if(!d||(p.s===(d.Status||'')&&p.m===(d.Domisili||'')))delete PCH[id]});
+    fillLap();renderDash();renderTable();updBar();
 }
 function tab(n){if(n===6)loadOps();if(n===7)renderLaporan();[1,2,3,4,5,6,7].forEach(i=>{const v=$('v'+i),b=$('t'+i);if(v)v.classList.toggle('hide',i!==n);if(b)b.classList.toggle('on',i===n)})}
 function home(){tab(U&&U.role==='alumni'?4:1)}
@@ -494,16 +499,46 @@ function renderTable(){
     PG=Math.min(Math.max(1,PG),pages);const start=(PG-1)*size,r=all.slice(start,start+size),pg=pagerHtml(total,size,pages,start);
     $('pgT').innerHTML=pg;$('pgB').innerHTML=pg;
     $('tb').innerHTML='<tr><th>No.</th><th>Nama</th><th>Tahun</th><th style="min-width:130px">Status</th><th style="min-width:120px">Domisili</th><th></th></tr>'+
-    (r.map((d,i)=>{return `<tr id="r_${esc(d.ID)}"><td data-l="No.">${start+i+1}</td><td data-l="" class="nm">${esc(d.Nama)}<br><small>${esc(d.NISN)}${adm?' · '+esc(d.Sekolah):''}</small></td><td data-l="Tahun lulus">${esc(d.TahunLulus)}</td>
-        <td data-l="Status"><select class="st"><option value="">— pilih —</option>${ST.map(s=>`<option${s===d.Status?' selected':''}>${s}</option>`).join('')}</select></td><td data-l="Domisili">${domCell(d.Domisili)}</td>
-        <td class="act" data-l="" style="white-space:nowrap"><button onclick="saveRow('${esc(d.ID)}')">Simpan</button> <button class="g" onclick="resetPw('${esc(d.ID)}')">Reset Sandi</button>${adm?` <button class="r" onclick="del('${esc(d.ID)}')">Hapus</button>`:''}</td></tr>`}).join('')||'<tr><td colspan="6">Tidak ada data yang cocok. Jika data siswa belum ada, admin perlu mengimpornya.</td></tr>');
+    (r.map((d,i)=>{const p=PCH[d.ID],cs=p?p.s:d.Status,cm=p?p.m:d.Domisili;return `<tr id="r_${esc(d.ID)}"${p?' class="chg"':''}><td data-l="No.">${start+i+1}</td><td data-l="" class="nm">${esc(d.Nama)}<br><small>${esc(d.NISN)}${adm?' · '+esc(d.Sekolah):''}</small></td><td data-l="Tahun lulus">${esc(d.TahunLulus)}</td>
+        <td data-l="Status"><select class="st"><option value="">— pilih —</option>${ST.map(s=>`<option${s===cs?' selected':''}>${s}</option>`).join('')}</select></td><td data-l="Domisili">${domCell(cm)}</td>
+        <td class="act" data-l="" style="white-space:nowrap"><button class="g" onclick="resetPw('${esc(d.ID)}')">Reset Sandi</button>${adm?` <button class="r" onclick="del('${esc(d.ID)}')">Hapus</button>`:''}</td></tr>`}).join('')||'<tr><td colspan="6">Tidak ada data yang cocok. Jika data siswa belum ada, admin perlu mengimpornya.</td></tr>');
 }
-async function saveRow(id){
-    const tr=$('r_'+id),btn=tr.querySelector('button');btn.textContent='...';
-    try{await call('updateStatus',T,id,tr.querySelector('.st').value,'','',(D.find(x=>x.ID===id)||{})._r,tr.querySelector('.dm').value);
-        const d=D.find(x=>x.ID===id);d.Status=tr.querySelector('.st').value;d.Instansi='';d.Detail='';d.Domisili=tr.querySelector('.dm').value;
-        btn.textContent='✓ Tersimpan';setTimeout(()=>btn.textContent='Simpan',1500);renderDash();
-    }catch(e){btn.textContent='Simpan';alert(e.message)}
+const PCH={};
+function updBar(){
+    const n=Object.keys(PCH).length;
+    $('pcT').innerHTML=n?`<b class="warn">${n.toLocaleString('id-ID')} perubahan belum disimpan</b>`:'Belum ada perubahan.';
+    $('btnSaveAll').disabled=!n;$('btnDisc').disabled=!n;
+}
+function chg(id){
+    const tr=$('r_'+id),d=D.find(x=>x.ID===id);if(!tr||!d)return;
+    const st=tr.querySelector('.st').value,dm=tr.querySelector('.dm').value;
+    if(st!==(d.Status||'')||dm!==(d.Domisili||''))PCH[id]={s:st,m:dm};else delete PCH[id];
+    tr.classList.remove('bad','okk');tr.classList.toggle('chg',!!PCH[id]);updBar();
+}
+document.addEventListener('change',e=>{const t=e.target;if(t&&t.closest&&t.closest('#tb')&&t.classList&&(t.classList.contains('st')||t.classList.contains('dm'))){const tr=t.closest('tr');if(tr&&tr.id.indexOf('r_')===0)chg(tr.id.slice(2))}});
+window.addEventListener('beforeunload',e=>{if(Object.keys(PCH).length){e.preventDefault();e.returnValue=''}});
+function discardAll(){
+    const n=Object.keys(PCH).length;if(!n)return;
+    if(!confirm('Batalkan '+n+' perubahan yang belum disimpan?'))return;
+    Object.keys(PCH).forEach(k=>delete PCH[k]);updBar();renderTable();
+}
+async function saveAll(){
+    const ids=Object.keys(PCH);if(!ids.length)return;
+    const items=[],tanpaStatus=[];
+    ids.forEach(id=>{const p=PCH[id];if(!p.s)tanpaStatus.push(id);else items.push({id:id,status:p.s,domisili:p.m})});
+    $('btnSaveAll').disabled=true;$('btnDisc').disabled=true;
+    let ok=[],gagal=[],err='';
+    try{for(let i=0;i<items.length;i+=200){const r=await call('updateStatusBatch',T,items.slice(i,i+200));ok=ok.concat(r.ok);gagal=gagal.concat(r.gagal)}}
+    catch(e){err=e.message||String(e);if(/Sesi/.test(err)){alert(err);doLogout();return}}
+    ok.forEach(id=>{const d=D.find(x=>x.ID===id),p=PCH[id];if(d&&p){d.Status=p.s;d.Instansi='';d.Detail='';d.Domisili=p.m}delete PCH[id];const tr=$('r_'+id);if(tr){tr.classList.remove('chg','bad');tr.classList.add('okk');setTimeout(()=>tr.classList.remove('okk'),2000)}});
+    const salah=tanpaStatus.concat(gagal.map(x=>x.id));
+    salah.forEach(id=>{const tr=$('r_'+id);if(tr){tr.classList.remove('chg');tr.classList.add('bad')}});
+    updBar();renderDash();
+    let msg=ok.length?`<b class="ok">${ok.length.toLocaleString('id-ID')} baris berhasil disimpan.</b>`:'';
+    if(salah.length){const alasan=tanpaStatus.length?'Status belum dipilih':gagal[0].alasan;msg+=` <b class="err">${salah.length.toLocaleString('id-ID')} baris belum tersimpan (${esc(alasan)}). Periksa baris merah.</b>`}
+    if(err)msg+=` <b class="err">${esc(err)}</b>`;
+    if(msg){const pc=$('pcT');pc.innerHTML=(Object.keys(PCH).length?`<b class="warn">${Object.keys(PCH).length} perubahan belum disimpan</b> · `:'')+msg}
+    $('btnSaveAll').disabled=!Object.keys(PCH).length;$('btnDisc').disabled=!Object.keys(PCH).length;
 }
 async function del(id){if(!confirm('Hapus data ini?'))return;try{await call('deleteAlumni',T,id);await load()}catch(e){alert(e.message)}}
 
