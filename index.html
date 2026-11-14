@@ -210,6 +210,14 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;borde
         </section>
 
         <section id="v2" class="hide">
+            <details class="card no-print" id="dImp">
+                <summary style="cursor:pointer;font-weight:600">Impor status alumni dari Excel</summary>
+                <p style="font-size:13px;margin:8px 0">Cara termudah: klik <b>Unduh daftar alumni (Excel)</b>, isi kolom <b>Status</b> dan <b>Domisili</b> (Dalam DIY / Luar DIY) di Excel, lalu unggah kembali di sini. Daftar yang diunduh mengikuti filter di bawah. Kolom file: <b>NISN, Nama, TahunLulus, Status, Domisili</b>. Siswa dicocokkan lewat NISN; bila NISN kosong, lewat Nama + TahunLulus. <b class="warn">Status dan Domisili wajib terisi di semua baris; bila ada yang kosong, impor tidak bisa dilakukan.</b> Status yang boleh: Melanjutkan Pendidikan, Bekerja, Berwirausaha, Mengikuti Pendidikan Nonformal/Pelatihan, Belum Bekerja, Kegiatan Lainnya.</p>
+                <div class="row"><button class="g" onclick="tplStatus()">Unduh daftar alumni (Excel)</button><button class="g" onclick="tpl('S')">Unduh template kosong</button></div>
+                <div class="row" style="margin-top:8px"><input type="file" id="fS" accept=".xlsx,.xls,.csv" onchange="impReset('S')"><button onclick="imp('S',true)">Periksa file</button><button id="bS" disabled onclick="imp('S',false)">Impor sekarang</button></div>
+                <div id="mS" style="font-size:13px"></div>
+                <div id="lS" class="sc"></div>
+            </details>
             <div class="card">
                 <div class="row">
                     <div><label>Cari</label><input id="q" placeholder="Nama / NISN" oninput="rt()"></div>
@@ -619,19 +627,20 @@ function exportCsv(){
 
 // ---- Impor Excel ----
 const MAP2={jenjang:'Jenjang',namasekolah:'Sekolah',sekolah:'Sekolah',npsn:'NPSN',programkeahlianjurusan:'Jurusan',jurusan:'Jurusan',tahun:'Tahun',llakilaki:'L',l:'L',pperempuan:'P',p:'P',jumlah:'Jumlah'};
-const MAP={namasekolah:'Sekolah',npsn:'NPSN',sekolah:'Sekolah',tahunlulus:'TahunLulus',tahun:'TahunLulus',nisn:'NISN',nama:'Nama',namasiswa:'Nama',jk:'JK',jeniskelamin:'JK',kota:'Kota',telepon:'Telepon',hp:'Telepon',nohp:'Telepon',username:'Username',password:'Password'};
+const MAP={namasekolah:'Sekolah',npsn:'NPSN',sekolah:'Sekolah',tahunlulus:'TahunLulus',tahun:'TahunLulus',nisn:'NISN',nama:'Nama',namasiswa:'Nama',jk:'JK',jeniskelamin:'JK',kota:'Kota',telepon:'Telepon',hp:'Telepon',nohp:'Telepon',username:'Username',password:'Password',status:'Status',statusalumni:'Status',domisili:'Domisili'};
 function readFile(f,MP){MP=MP||MAP;return new Promise((ok,no)=>{const r=new FileReader(),csv=/\.csv$/i.test(f.name);r.onerror=no;r.onload=e=>{try{
     const wb=XLSX.read(e.target.result,{type:csv?'string':'array'});
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false,blankrows:true});
     ok(rows.map((o,i)=>{const n={_n:i+2};for(const k in o){const m=MP[k.toLowerCase().replace(/[^a-z]/g,'')];if(m)n[m]=String(o[k]).trim()}return n}).filter(n=>Object.keys(n).some(k=>k!=='_n'&&n[k]!=='')))
     }catch(x){no(x)}};csv?r.readAsText(f,'UTF-8'):r.readAsArrayBuffer(f)})}
-const PEND={},REP={},RJ={A:'importAlumni',O:'importOperator',R:'importRekap'},REQ={A:['Sekolah','TahunLulus','Nama'],O:['Username','Password','Sekolah'],R:['Sekolah','Tahun']};
+const PEND={},REP={},RJ={A:'importAlumni',O:'importOperator',R:'importRekap',S:'importStatus'},REQ={A:['Sekolah','TahunLulus','Nama'],O:['Username','Password','Sekolah'],R:['Sekolah','Tahun'],S:['Status','Domisili']};
 const NK=x=>String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 function impReset(k){delete PEND[k];$('b'+k).disabled=true;$('m'+k).textContent='';$('l'+k).innerHTML=''}
 function clientDup(k,rows){
     const seen={},out=[];
     rows.forEach(r=>{let key;
         if(k==='A'){const d=String(r.NISN||'').replace(/\D/g,'');key=d?'N|'+('0000000000'+d).slice(-10):'X|'+NK(r.Sekolah)+'|'+r.TahunLulus+'|'+NK(r.Nama)}
+        else if(k==='S'){const d=String(r.NISN||'').replace(/\D/g,'');key=d?'N|'+('0000000000'+d).slice(-10):'X|'+NK(r.Nama)+'|'+r.TahunLulus}
         else if(k==='O')key=String(r.Username||'').trim().toLowerCase();
         else return;
         if(!key)return;
@@ -650,22 +659,22 @@ async function imp(k,dry){
             const miss=REQ[k].filter(c=>!rows.some(r=>r[c]));
             if(miss.length)throw new Error('Kolom wajib tidak ditemukan atau kosong: '+miss.join(', ')+'. Periksa judul kolom (lihat template).');
         }else rows=PEND[k].rows;
-        const rep={tambah:0,masalah:[],peringatan:[],tanpaOp:new Set()};
+        const rep={tambah:0,belum:0,masalah:[],peringatan:[],tanpaOp:new Set()};
         for(let i=0;i<rows.length;i+=300){m.textContent=(dry?'Memeriksa ':'Mengimpor ')+Math.min(i+300,rows.length)+' / '+rows.length+'...';
             const r=await call(RJ[k],T,rows.slice(i,i+300),i===0,!!dry);
-            rep.tambah+=r.tambah;rep.masalah.push(...r.masalah);rep.peringatan.push(...r.peringatan);(r.tanpaOperator||[]).forEach(x=>rep.tanpaOp.add(x))}
+            rep.tambah+=r.tambah;rep.belum+=r.belumLengkap||0;rep.masalah.push(...r.masalah);rep.peringatan.push(...r.peringatan);(r.tanpaOperator||[]).forEach(x=>rep.tanpaOp.add(x))}
         if(dry){const rej=new Set(rep.masalah.map(x=>x.n));
             clientDup(k,rows).forEach(x=>{rep.masalah.push(x);if(!rej.has(x.n))rep.tambah--});PEND[k]={rows}}
         showRep(k,rep,dry);
-        if(dry)$('b'+k).disabled=rep.tambah<=0;
-        else{delete PEND[k];$('b'+k).disabled=true;$('f'+k).value='';if(k==='A'||k==='R')load()}
+        if(dry)$('b'+k).disabled=rep.tambah<=0||(k==='S'&&rep.belum>0);
+        else{delete PEND[k];$('b'+k).disabled=true;$('f'+k).value='';if(k==='A'||k==='R'||k==='S')load()}
     }catch(e){m.className='warn';m.textContent='Gagal: '+(e.message||e)}
 }
 function showRep(k,rep,dry){
     const m=$('m'+k),l=$('l'+k);
     const all=rep.masalah.map(x=>({...x,j:'Ditolak'})).concat(rep.peringatan.map(x=>({...x,j:'Peringatan'}))).sort((a,b)=>(a.n||0)-(b.n||0));REP[k]=all;
     m.className=rep.tambah>0?'ok':'warn';
-    m.innerHTML=`<b>${rep.tambah.toLocaleString('id-ID')}</b> baris ${dry?'siap ditambahkan':'berhasil ditambahkan'} · <b>${rep.masalah.length.toLocaleString('id-ID')}</b> ditolak · <b>${rep.peringatan.length.toLocaleString('id-ID')}</b> peringatan`+(dry?(rep.tambah>0?'. Jika sudah sesuai, klik <b>Impor sekarang</b>.':'. Tidak ada baris yang bisa diimpor.'):'.');
+    m.innerHTML=`<b>${rep.tambah.toLocaleString('id-ID')}</b> baris ${k==='S'?(dry?'siap diperbarui':'berhasil diperbarui'):(dry?'siap ditambahkan':'berhasil ditambahkan')} · <b>${rep.masalah.length.toLocaleString('id-ID')}</b> ditolak · <b>${rep.peringatan.length.toLocaleString('id-ID')}</b> peringatan`+(dry?(k==='S'&&rep.belum>0?`. <b class="err">Impor belum bisa dilakukan: ${rep.belum.toLocaleString('id-ID')} baris belum lengkap (Status/Domisili kosong). Lengkapi file lalu klik Periksa file lagi.</b>`:rep.tambah>0?'. Jika sudah sesuai, klik <b>Impor sekarang</b>.':'. Tidak ada baris yang bisa diimpor.'):'.');
     let h='';
     if(rep.tanpaOp.size)h+=`<p class="warn" style="font-size:13px">Sekolah di file ini yang belum punya akun operator (${rep.tanpaOp.size}): ${[...rep.tanpaOp].slice(0,15).map(esc).join(', ')}${rep.tanpaOp.size>15?', …':''}</p>`;
     if(all.length)h+=`<table style="margin-top:8px"><tr><th>Baris</th><th>Jenis</th><th>Alasan</th><th>Data</th></tr>`+all.slice(0,100).map(x=>`<tr><td>${esc(x.n)}</td><td class="${x.j==='Ditolak'?'err':'warn'}">${x.j}</td><td>${esc(x.alasan)}</td><td>${esc(x.info)}</td></tr>`).join('')+`</table><div style="font-size:12px;margin:6px 0">${all.length>100?`Menampilkan 100 dari ${all.length}. `:''}<button class="g" onclick="dlRep('${k}')">Unduh laporan lengkap (CSV)</button></div>`;
@@ -674,9 +683,22 @@ function showRep(k,rep,dry){
 function dlRep(k){const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
     const csv=['Baris,Jenis,Alasan,Data'].concat((REP[k]||[]).map(x=>[x.n,x.j,x.alasan,x.info].map(q).join(','))).join('\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download='laporan-impor-'+k+'.csv';a.click()}
+function tplStatus(){
+    if(typeof XLSX==='undefined'){alert('Pustaka Excel belum termuat. Periksa koneksi internet lalu muat ulang halaman.');return}
+    const L=filtered();
+    if(!L.length){alert('Tidak ada alumni pada filter saat ini.');return}
+    const aoa=[['NISN','Nama','TahunLulus','Status','Domisili','Sekolah (tidak diimpor)']].concat(L.map(d=>[String(d.NISN||''),d.Nama||'',d.TahunLulus||'',d.Status||'',d.Domisili||'',d.Sekolah||'']));
+    const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[12,32,11,38,12,32].map(x=>({wch:x}));
+    const pil=XLSX.utils.aoa_to_sheet([['Status yang boleh diisi']].concat(ST.map(x=>[x]),[[''],['Domisili yang boleh diisi'],['Dalam DIY'],['Luar DIY']]));pil['!cols']=[{wch:44}];
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Status Alumni');XLSX.utils.book_append_sheet(wb,pil,'Pilihan');
+    const out=XLSX.write(wb,{type:'array',bookType:'xlsx'}),a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([out],{type:'application/octet-stream'}));
+    const sk=($('fsk').value||U.sekolah||'semua').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+    a.download='status-alumni-'+sk+'.xlsx';a.click();
+}
 function tpl(k){
-    const csv={A:'Sekolah,NPSN,TahunLulus,NISN,Nama,JK,Kota,Telepon\nSMAN 1 Contoh,20400000,2025,0012345678,Budi Santoso,L,Yogyakarta,\n',O:'Username,Password,Sekolah,NPSN\nsman1contoh,GantiPassword123,SMAN 1 Contoh,20400000\n',R:'Jenjang,Nama Sekolah,NPSN,Program Keahlian/Jurusan,Tahun,L (Laki-laki),P (Perempuan),Jumlah\nSMA,SMAN 1 Contoh,20400000,MIPA,2025,20,50,70\n'}[k];
-    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download={A:'template-siswa.csv',O:'template-operator.csv',R:'template-rekap-lulusan.csv'}[k];a.click();
+    const csv={A:'Sekolah,NPSN,TahunLulus,NISN,Nama,JK,Kota,Telepon\nSMAN 1 Contoh,20400000,2025,0012345678,Budi Santoso,L,Yogyakarta,\n',O:'Username,Password,Sekolah,NPSN\nsman1contoh,GantiPassword123,SMAN 1 Contoh,20400000\n',R:'Jenjang,Nama Sekolah,NPSN,Program Keahlian/Jurusan,Tahun,L (Laki-laki),P (Perempuan),Jumlah\nSMA,SMAN 1 Contoh,20400000,MIPA,2025,20,50,70\n',S:'NISN,Nama,TahunLulus,Status,Domisili\n0012345678,Budi Santoso,2025,Bekerja,Dalam DIY\n'}[k];
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download={A:'template-siswa.csv',O:'template-operator.csv',R:'template-rekap-lulusan.csv',S:'template-status-alumni.csv'}[k];a.click();
 }
 </script>
 </body>
