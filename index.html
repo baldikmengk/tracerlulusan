@@ -73,6 +73,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;borde
 .sc{overflow-x:auto}.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:end}.row>*{flex:1;min-width:130px}.row button{flex:0 0 auto}
 .tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button{background:#fff;color:var(--t);border:1px solid #cbd5e1}.tabs button.on{background:var(--b);color:#fff}
 .hide{display:none!important}
+.ft{text-align:center;font-size:12px;color:var(--m);padding:14px 12px 18px}
+.lg .ft{position:absolute;left:0;right:0;bottom:0;color:rgba(255,255,255,.85);padding:10px 12px 14px}
 .lg{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:20px;background:linear-gradient(135deg,#0a2463 0%,#1a56db 55%,#0e9fa8 100%)}
 .lg .bg{position:absolute;inset:0;width:100%;height:100%}.bg.port{display:none}@media (max-aspect-ratio:1/1){.bg.land{display:none}.bg.port{display:block}}
 .trace{stroke-dasharray:3 11;animation:dash 40s linear infinite}
@@ -100,7 +102,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;borde
 .seg button{flex:1 1 auto;width:auto;background:transparent;color:#4b5563;border:0;border-radius:999px;padding:9px 10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .seg button.on{background:linear-gradient(135deg,#1a56db,#1e40af);color:#fff;box-shadow:0 4px 12px rgba(26,86,219,.35)}
 .lhint{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:10px;padding:9px 12px;font-size:13px;margin:0 0 14px;line-height:1.45}
-.wrap .note{color:rgba(255,255,255,.85);font-size:12.5px;margin-top:16px}
+.wrap .note{color:rgba(255,255,255,.85);font-size:12.5px;margin-top:16px}.wrap .note.cr{font-size:11.5px;margin-top:6px;color:rgba(255,255,255,.7)}
 .pager{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px;margin:8px 0}.pager button{padding:5px 11px}.pager input{width:72px;padding:5px 8px}
 #busy{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#fffbeb;border:1px solid #fcd34d;color:#92400e;padding:8px 16px;border-radius:10px;font-size:14px;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.18);max-width:92vw;text-align:center}
 .err{color:#dc2626}
@@ -173,7 +175,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;borde
             <button id="bl" onclick="doLogin()">Masuk</button>
             <div id="msg"></div>
         </div>
-        <div class="note">Pelacakan lulusan SMA se-Kabupaten Gunungkidul</div>
+        <div class="note">Penelusuran Lulusan SMA/SMK se-Kabupaten Gunungkidul</div>
+        <div class="note cr">@2026 - Credit by Triyuliant</div>
     </div>
 </div>
 
@@ -309,6 +312,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;borde
             </div>
         </section>
     </main>
+    <div class="ft no-print">@2026 - Credit by Triyuliant</div>
 </div>
 
 <script>
