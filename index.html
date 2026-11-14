@@ -57,6 +57,7 @@
 <base target="_top">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script>try{if(localStorage.getItem('tema')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
 <style>
 :root{--b:#1a56db;--bg:#f4f6fa;--c:#fff;--t:#1f2937;--m:#6b7280;--l:#e5e7eb}
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,Arial,sans-serif;background:var(--bg);color:var(--t)}
@@ -143,7 +144,7 @@ tr.chg td{background:#fffbeb}tr.bad td{background:#fee2e2}tr.okk td{background:#
     .stat b{font-size:22px}.dn svg{margin:0 auto}
     table.rt{display:block}table.rt tbody{display:block}
     table.rt tr:first-child{display:none}
-    table.rt tr{display:block;border:1px solid var(--l);border-radius:10px;padding:10px;margin-bottom:10px;background:#fff}
+    table.rt tr{display:block;border:1px solid var(--l);border-radius:10px;padding:10px;margin-bottom:10px;background:var(--c)}
     table.rt td{display:block;border:0;padding:4px 0}
     table.rt td::before{content:attr(data-l);display:block;font-size:11px;color:var(--m)}
     table.rt td[data-l=""]::before{display:none}
@@ -153,6 +154,35 @@ tr.chg td{background:#fffbeb}tr.bad td{background:#fee2e2}tr.okk td{background:#
     table.rt td input,table.rt td select{padding:10px}
 }
 .ok{color:#16a34a}.warn{color:#b45309}small{color:var(--m)}
+.thb{position:absolute;top:12px;right:12px;width:40px!important;height:40px;border-radius:50%;padding:0!important;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.45);font-size:18px;line-height:1;z-index:3;cursor:pointer}
+header .th{padding:6px 10px;font-size:15px;line-height:1}
+@media screen{
+:root[data-theme="dark"]{--b:#3b82f6;--bg:#0b1220;--c:#162033;--t:#e5e7eb;--m:#94a3b8;--l:#2b3a52;color-scheme:dark}
+[data-theme="dark"] input,[data-theme="dark"] select{background:#0f1a2d;color:var(--t);border-color:#3b4b66}
+[data-theme="dark"] input::placeholder{color:#64748b}
+[data-theme="dark"] button.g,[data-theme="dark"] .tabs button{background:#1e2b42;color:var(--t);border-color:#3b4b66}
+[data-theme="dark"] .tabs button.on{background:var(--b);color:#fff;border-color:var(--b)}
+[data-theme="dark"] header{background:#1e3a8a}
+[data-theme="dark"] header button{background:#e2e8f0;color:#1e3a8a}
+[data-theme="dark"] tr.chg td{background:#3a2a0a}[data-theme="dark"] tr.bad td{background:#4a1515}[data-theme="dark"] tr.okk td{background:#0f3320}
+[data-theme="dark"] .sb{background:#2b3a52}
+[data-theme="dark"] .lt th{background:#22314a}[data-theme="dark"] .lt th,[data-theme="dark"] .lt td{border-color:#3b4b66}
+[data-theme="dark"] .lt3{color:#93c5fd}
+[data-theme="dark"] code{background:#22314a!important;color:#e5e7eb}
+[data-theme="dark"] .warn{color:#fbbf24}[data-theme="dark"] .err{color:#f87171}[data-theme="dark"] .ok{color:#4ade80}
+[data-theme="dark"] #ld{background:rgba(11,18,32,.65)}
+[data-theme="dark"] #busy{background:#3a2a0a;border-color:#92400e;color:#fcd34d}
+[data-theme="dark"] .box{background:rgba(22,32,51,.96)}
+[data-theme="dark"] .box h1,[data-theme="dark"] .wl{color:#e2e8f0}
+[data-theme="dark"] .box h1 span{color:#93c5fd}
+[data-theme="dark"] .f label{color:#cbd5e1}
+[data-theme="dark"] .lg .f input,[data-theme="dark"] .lg .f input:focus{background:#0f1a2d;border-color:#3b4b66}
+[data-theme="dark"] .seg{background:#0f1a2d;border-color:#2b3a52}
+[data-theme="dark"] .seg button{color:#cbd5e1}[data-theme="dark"] .seg button.on{color:#fff}
+[data-theme="dark"] .lhint{background:#14284d;border-color:#1e40af;color:#bfdbfe}
+[data-theme="dark"] .logo{border-color:#162033}
+[data-theme="dark"] .lg{background:linear-gradient(135deg,#050b1f 0%,#13306f 55%,#0b6b73 100%)}
+}
 </style>
 </head>
 <body>
@@ -165,6 +195,7 @@ tr.chg td{background:#fffbeb}tr.bad td{background:#fee2e2}tr.okk td{background:#
 <radialGradient id="gl" cx="85%" cy="10%" r="55%"><stop offset="0" stop-color="#5eead4" stop-opacity=".35"/><stop offset="1" stop-color="#5eead4" stop-opacity="0"/></radialGradient></defs></svg>
     <svg class="bg land" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="100%" height="100%" fill="url(#dots)"/><rect width="100%" height="100%" fill="url(#gl)"/><g fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"><path class="trace" d="M150 640 C350 400 700 420 1010 170"/><path class="trace" d="M150 640 C500 600 800 300 1060 430"/><path class="trace" d="M150 640 C400 740 700 700 930 620"/><path class="trace" d="M150 640 C100 450 150 250 300 150"/></g><g stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(150,640)"><circle r="42" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-cap"/><text y="66" text-anchor="middle" fill="#fff" fill-opacity="0.9" stroke="none" font-size="15" font-weight="600" font-family="system-ui,Arial">Lulusan SMA/SMK</text></g><g transform="translate(1010,170)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-uni"/><text y="64" text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="14" font-weight="400" font-family="system-ui,Arial">Melanjutkan Pendidikan</text></g><g transform="translate(1060,430)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-job"/><text y="64" text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="14" font-weight="400" font-family="system-ui,Arial">Bekerja</text></g><g transform="translate(930,620)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-biz"/><text y="64" text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="14" font-weight="400" font-family="system-ui,Arial">Berwirausaha</text></g><g transform="translate(300,150)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-cert"/><text y="64" text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="14" font-weight="400" font-family="system-ui,Arial">Pelatihan</text></g></g><g fill="#fff"><circle class="fl" cx="520" cy="90" r="7" fill-opacity=".18"/><circle class="fl fl2" cx="760" cy="720" r="10" fill-opacity=".14"/><circle class="fl fl2" cx="90" cy="300" r="6" fill-opacity=".2"/><circle class="fl" cx="1130" cy="600" r="8" fill-opacity=".16"/></g></svg>
     <svg class="bg port" viewBox="0 0 600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="100%" height="100%" fill="url(#dots)"/><rect width="100%" height="100%" fill="url(#gl)"/><g fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"><path class="trace" d="M135 880 C0 600 20 300 140 125"/><path class="trace" d="M135 880 C640 700 640 300 450 125"/><path class="trace" d="M135 880 C220 950 270 950 335 920"/><path class="trace" d="M135 880 C300 800 400 800 460 840"/></g><g stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(135,880)"><circle r="44" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-cap"/><text text-anchor="middle" fill="#fff" fill-opacity="0.9" stroke="none" font-size="20" font-weight="600" font-family="system-ui,Arial"><tspan x="0" dy="68">Lulusan SMA/SMK</tspan></text></g><g transform="translate(450,125)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-uni"/><text text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="20" font-weight="400" font-family="system-ui,Arial"><tspan x="0" dy="64">Melanjutkan</tspan><tspan x="0" dy="23">Pendidikan</tspan></text></g><g transform="translate(335,920)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-job"/><text text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="20" font-weight="400" font-family="system-ui,Arial"><tspan x="0" dy="64">Bekerja</tspan></text></g><g transform="translate(460,840)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-biz"/><text text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="20" font-weight="400" font-family="system-ui,Arial"><tspan x="0" dy="64">Berwirausaha</tspan></text></g><g transform="translate(140,125)"><circle r="40" fill="#fff" fill-opacity=".14" stroke-opacity=".55"/><use href="#i-cert"/><text text-anchor="middle" fill="#fff" fill-opacity="0.8" stroke="none" font-size="20" font-weight="400" font-family="system-ui,Arial"><tspan x="0" dy="64">Pelatihan</tspan></text></g></g><g fill="#fff"><circle class="fl" cx="300" cy="60" r="8" fill-opacity=".18"/><circle class="fl fl2" cx="540" cy="520" r="9" fill-opacity=".14"/><circle class="fl fl2" cx="60" cy="480" r="7" fill-opacity=".2"/></g></svg>
+    <button id="thL" class="thb" onclick="toggleTheme()" aria-label="Ganti mode gelap atau terang">🌙</button>
     <div class="inst">Balai Pendidikan Menengah Kabupaten Gunungkidul</div>
     <div class="wrap">
         <div class="box">
@@ -194,7 +225,7 @@ tr.chg td{background:#fffbeb}tr.bad td{background:#fee2e2}tr.okk td{background:#
 </div>
 
 <div id="app" class="hide">
-    <header><b>Pendataan Lulusan — <span id="sk"></span></b><span><button onclick="tab(5)">Ganti Password</button> <button onclick="doLogout()">Keluar</button></span></header>
+    <header><b>Pendataan Lulusan — <span id="sk"></span></b><span><button id="thH" class="th" onclick="toggleTheme()" aria-label="Ganti mode gelap atau terang">🌙</button> <button onclick="tab(5)">Ganti Password</button> <button onclick="doLogout()">Keluar</button></span></header>
     <main>
         <div class="tabs" id="tabs">
             <button id="t1" class="on" onclick="tab(1)">Dashboard</button>
@@ -517,9 +548,14 @@ function chg(id){
 }
 document.addEventListener('change',e=>{const t=e.target;if(t&&t.closest&&t.closest('#tb')&&t.classList&&(t.classList.contains('st')||t.classList.contains('dm'))){const tr=t.closest('tr');if(tr&&tr.id.indexOf('r_')===0)chg(tr.id.slice(2))}});
 window.addEventListener('beforeunload',e=>{if(Object.keys(PCH).length){e.preventDefault();e.returnValue=''}});
+let DISC_T=null;
 function discardAll(){
-    const n=Object.keys(PCH).length;if(!n)return;
-    if(!confirm('Batalkan '+n+' perubahan yang belum disimpan?'))return;
+    const n=Object.keys(PCH).length,b=$('btnDisc');if(!n)return;
+    if(!DISC_T){   // klik pertama: minta konfirmasi di tombol (tanpa kotak dialog browser)
+        b.textContent='Klik lagi untuk membatalkan '+n+' perubahan';b.classList.add('r');
+        DISC_T=setTimeout(()=>{DISC_T=null;b.textContent='Batalkan perubahan';b.classList.remove('r')},4000);return;
+    }
+    clearTimeout(DISC_T);DISC_T=null;b.textContent='Batalkan perubahan';b.classList.remove('r');
     Object.keys(PCH).forEach(k=>delete PCH[k]);updBar();renderTable();
 }
 async function saveAll(){
@@ -600,9 +636,9 @@ async function doNpsn(){
 const COL=['#2563eb','#16a34a','#f59e0b','#8b5cf6','#ef4444','#64748b'];
 function donut(c,f){
     const r=62,C=2*Math.PI*r;let off=0;
-    const arcs=f?ST.map((s,i)=>{const len=C*c[s]/f,a=`<circle cx="80" cy="80" r="${r}" fill="none" stroke="${COL[i]}" stroke-width="26" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 80 80)"><title>${esc(s)}: ${c[s]}</title></circle>`;off+=len;return a}).join(''):'<circle cx="80" cy="80" r="62" fill="none" stroke="#e5e7eb" stroke-width="26"/>';
+    const arcs=f?ST.map((s,i)=>{const len=C*c[s]/f,a=`<circle cx="80" cy="80" r="${r}" fill="none" stroke="${COL[i]}" stroke-width="26" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 80 80)"><title>${esc(s)}: ${c[s]}</title></circle>`;off+=len;return a}).join(''):'<circle cx="80" cy="80" r="62" fill="none" style="stroke:var(--l)" stroke-width="26"/>';
     const leg=ST.map((s,i)=>`<div class="lg2"><i style="background:${COL[i]}"></i><span>${esc(s)}</span><b>${c[s]}</b><small>${f?(c[s]*100/f).toFixed(1):'0.0'}%</small></div>`).join('');
-    return `<div class="dn"><svg viewBox="0 0 160 160" width="170" height="170"><g>${arcs}</g><text x="80" y="78" text-anchor="middle" font-size="26" font-weight="700" fill="#1f2937">${f}</text><text x="80" y="97" text-anchor="middle" font-size="11" fill="#6b7280">sudah mengisi</text></svg><div class="leg">${leg}</div></div>`;
+    return `<div class="dn"><svg viewBox="0 0 160 160" width="170" height="170"><g>${arcs}</g><text x="80" y="78" text-anchor="middle" font-size="26" font-weight="700" style="fill:var(--t)">${f}</text><text x="80" y="97" text-anchor="middle" font-size="11" style="fill:var(--m)">sudah mengisi</text></svg><div class="leg">${leg}</div></div>`;
 }
 function stackYear(rows){
     const yrs=[...new Set(rows.map(d=>Number(d.TahunLulus)))].sort((a,b)=>a-b);
@@ -645,7 +681,7 @@ function renderLaporan(){
     if(!U||U.role==='alumni')return;
     const m=lapModel(),n=x=>Number(x).toLocaleString('id-ID'),pct=(a,b)=>b?(a*100/b).toFixed(1)+'%':'-',base=m.lul||m.al.length;
     const th=ST.map(s=>`<th>${esc(s)}</th>`).join('');
-    let h=`<div><div style="font-size:12px;letter-spacing:.08em;color:var(--m)">LAPORAN</div><h2 style="margin:2px 0 0;font-size:20px;color:#0a2463">Pendataan Lulusan Jenjang SMA/SMK Kab. Gunungkidul</h2><div style="font-weight:600;margin-top:4px">${esc(m.scope)}</div><div style="font-size:13px;color:var(--m)">${m.per} · Dicetak ${m.tgl} oleh ${esc(U.username)}</div></div>`;
+    let h=`<div><div style="font-size:12px;letter-spacing:.08em;color:var(--m)">LAPORAN</div><h2 style="margin:2px 0 0;font-size:20px;color:var(--t)">Pendataan Lulusan Jenjang SMA/SMK Kab. Gunungkidul</h2><div style="font-weight:600;margin-top:4px">${esc(m.scope)}</div><div style="font-size:13px;color:var(--m)">${m.per} · Dicetak ${m.tgl} oleh ${esc(U.username)}</div></div>`;
     h+=`<div class="stat" style="margin:14px 0"><div><b>${m.hasRekap?n(m.lul):'-'}</b><span>Jumlah lulusan (rekap dinas)</span></div><div><b>${n(m.al.length)}</b><span>Terdata di aplikasi</span></div><div><b class="ok">${n(m.f)}</b><span>Sudah mengisi (${pct(m.f,base)} dari ${m.lul?'lulusan':'terdata'})</span></div><div><b class="warn">${n(m.al.length-m.f)}</b><span>Belum mengisi</span></div></div>`;
     h+=`<h3 class="lt3">Distribusi status alumni</h3>${donut(m.c,m.f)}`;
     h+=`<h3 class="lt3">Per tahun lulus</h3><div class="cols"><div>${stackYear(m.al)}</div><div></div></div><div class="sc" style="margin-top:8px"><table class="lt"><tr><th>Tahun</th><th>Lulusan (rekap)</th><th>Terdata</th><th>Sudah mengisi</th><th>Progres</th>${th}</tr>`+
@@ -774,6 +810,10 @@ function tpl(k){
     const csv={A:'Sekolah,NPSN,TahunLulus,NISN,Nama,JK,Kota,Telepon\nSMAN 1 Contoh,20400000,2025,0012345678,Budi Santoso,L,Yogyakarta,\n',O:'Username,Password,Sekolah,NPSN\nsman1contoh,GantiPassword123,SMAN 1 Contoh,20400000\n',R:'Jenjang,Nama Sekolah,NPSN,Program Keahlian/Jurusan,Tahun,L (Laki-laki),P (Perempuan),Jumlah\nSMA,SMAN 1 Contoh,20400000,MIPA,2025,20,50,70\n',S:'NISN,Nama,TahunLulus,Status,Domisili\n0012345678,Budi Santoso,2025,Bekerja,Dalam DIY\n'}[k];
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download={A:'template-siswa.csv',O:'template-operator.csv',R:'template-rekap-lulusan.csv',S:'template-status-alumni.csv'}[k];a.click();
 }
+
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);['thH','thL'].forEach(i=>{const b=$(i);if(b){b.textContent=t==='dark'?'☀️':'🌙';b.title=t==='dark'?'Beralih ke mode terang':'Beralih ke mode gelap'}})}
+function toggleTheme(){const t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';setTheme(t);try{localStorage.setItem('tema',t)}catch(e){}}
+setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light');
 </script>
 </body>
 </html>
