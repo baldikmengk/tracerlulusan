@@ -56,6 +56,7 @@
 </script>
 <base target="_top">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
 :root{--b:#1a56db;--bg:#f4f6fa;--c:#fff;--t:#1f2937;--m:#6b7280;--l:#e5e7eb}
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,Arial,sans-serif;background:var(--bg);color:var(--t)}
@@ -212,7 +213,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;borde
         <section id="v2" class="hide">
             <details class="card no-print" id="dImp">
                 <summary style="cursor:pointer;font-weight:600">Impor status alumni dari Excel</summary>
-                <p style="font-size:13px;margin:8px 0">Cara termudah: klik <b>Unduh daftar alumni (Excel)</b>, isi kolom <b>Status</b> dan <b>Domisili</b> (Dalam DIY / Luar DIY) di Excel, lalu unggah kembali di sini. Daftar yang diunduh mengikuti filter di bawah. Kolom file: <b>NISN, Nama, TahunLulus, Status, Domisili</b>. Siswa dicocokkan lewat NISN; bila NISN kosong, lewat Nama + TahunLulus. <b class="warn">Status dan Domisili wajib terisi di semua baris; bila ada yang kosong, impor tidak bisa dilakukan.</b> Status yang boleh: Melanjutkan Pendidikan, Bekerja, Berwirausaha, Mengikuti Pendidikan Nonformal/Pelatihan, Belum Bekerja, Kegiatan Lainnya.</p>
+                <p style="font-size:13px;margin:8px 0">Cara termudah: klik <b>Unduh daftar alumni (Excel)</b>, isi kolom <b>Status</b> dan <b>Domisili</b> (Dalam DIY / Luar DIY) di Excel, lalu unggah kembali di sini. Daftar yang diunduh mengikuti filter di bawah. Kolom file: <b>NISN, Nama, TahunLulus, Status, Domisili</b>. Siswa dicocokkan lewat NISN; bila NISN kosong, lewat Nama + TahunLulus. <b class="warn">Status dan Domisili wajib terisi di semua baris; bila ada yang kosong, impor tidak bisa dilakukan.</b> Status yang boleh: Melanjutkan Pendidikan, Bekerja, Berwirausaha, Mengikuti Pendidikan Nonformal/Pelatihan, Belum Bekerja. Di file Excel yang diunduh, kolom Status dan Domisili berupa pilihan (dropdown) dan tidak bisa diisi di luar pilihan.</p>
                 <div class="row"><button class="g" onclick="tplStatus()">Unduh daftar alumni (Excel)</button><button class="g" onclick="tpl('S')">Unduh template kosong</button></div>
                 <div class="row" style="margin-top:8px"><input type="file" id="fS" accept=".xlsx,.xls,.csv" onchange="impReset('S')"><button onclick="imp('S',true)">Periksa file</button><button id="bS" disabled onclick="imp('S',false)">Impor sekarang</button></div>
                 <div id="mS" style="font-size:13px"></div>
@@ -324,7 +325,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;borde
 </div>
 
 <script>
-const ST=['Melanjutkan Pendidikan','Bekerja','Berwirausaha','Mengikuti Pendidikan Nonformal/Pelatihan','Belum Bekerja','Kegiatan Lainnya'];
+const ST=['Melanjutkan Pendidikan','Bekerja','Berwirausaha','Mengikuti Pendidikan Nonformal/Pelatihan','Belum Bekerja'];
 const BB='Belum Bekerja';
 const DOM=['Dalam DIY','Luar DIY'];
 const domCell=v=>`<select class="dm"><option value="">— pilih —</option>${DOM.map(x=>`<option${x===v?' selected':''}>${x}</option>`).join('')}</select>`;
@@ -683,7 +684,7 @@ function showRep(k,rep,dry){
 function dlRep(k){const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
     const csv=['Baris,Jenis,Alasan,Data'].concat((REP[k]||[]).map(x=>[x.n,x.j,x.alasan,x.info].map(q).join(','))).join('\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download='laporan-impor-'+k+'.csv';a.click()}
-function tplStatus(){
+function tplStatusPlain(){
     if(typeof XLSX==='undefined'){alert('Pustaka Excel belum termuat. Periksa koneksi internet lalu muat ulang halaman.');return}
     const L=filtered();
     if(!L.length){alert('Tidak ada alumni pada filter saat ini.');return}
@@ -695,6 +696,27 @@ function tplStatus(){
     a.href=URL.createObjectURL(new Blob([out],{type:'application/octet-stream'}));
     const sk=($('fsk').value||U.sekolah||'semua').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
     a.download='status-alumni-'+sk+'.xlsx';a.click();
+}
+async function tplStatus(){
+    if(typeof ExcelJS==='undefined'){alert('Pustaka untuk membuat pilihan (dropdown) belum termuat, jadi file diunduh tanpa dropdown. Muat ulang halaman bila ingin file dengan pilihan.');return tplStatusPlain()}
+    const L=filtered();
+    if(!L.length){alert('Tidak ada alumni pada filter saat ini.');return}
+    try{
+        const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Status Alumni',{views:[{state:'frozen',ySplit:1}]});
+        ws.columns=[{header:'NISN',width:12},{header:'Nama',width:32},{header:'TahunLulus',width:11},{header:'Status',width:40},{header:'Domisili',width:13},{header:'Sekolah (tidak diimpor)',width:32}];
+        ws.getColumn(1).numFmt='@';ws.getRow(1).font={bold:true};
+        L.forEach(d=>ws.addRow([String(d.NISN||''),d.Nama||'',Number(d.TahunLulus)||d.TahunLulus||'',ST.indexOf(d.Status)>=0?d.Status:'',d.Domisili||'',d.Sekolah||'']));
+        const dv=(lst,judul)=>({type:'list',allowBlank:false,formulae:['"'+lst.join(',')+'"'],showErrorMessage:true,errorStyle:'stop',errorTitle:judul+' tidak valid',error:'Pilih salah satu dari daftar pilihan.',showInputMessage:true,promptTitle:judul,prompt:'Pilih dari daftar.'});
+        const dvS=dv(ST,'Status'),dvD=dv(['Dalam DIY','Luar DIY'],'Domisili');
+        for(let r=2;r<=L.length+1;r++){ws.getCell('D'+r).dataValidation=dvS;ws.getCell('E'+r).dataValidation=dvD}
+        const p=wb.addWorksheet('Pilihan');p.getColumn(1).width=44;
+        [['Status yang boleh diisi']].concat(ST.map(x=>[x]),[[''],['Domisili yang boleh diisi'],['Dalam DIY'],['Luar DIY']]).forEach(r=>p.addRow(r));
+        p.getCell('A1').font={bold:true};
+        const buf=await wb.xlsx.writeBuffer(),a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+        const sk=($('fsk').value||U.sekolah||'semua').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+        a.download='status-alumni-'+sk+'.xlsx';a.click();
+    }catch(e){alert('Gagal membuat file: '+(e.message||e))}
 }
 function tpl(k){
     const csv={A:'Sekolah,NPSN,TahunLulus,NISN,Nama,JK,Kota,Telepon\nSMAN 1 Contoh,20400000,2025,0012345678,Budi Santoso,L,Yogyakarta,\n',O:'Username,Password,Sekolah,NPSN\nsman1contoh,GantiPassword123,SMAN 1 Contoh,20400000\n',R:'Jenjang,Nama Sekolah,NPSN,Program Keahlian/Jurusan,Tahun,L (Laki-laki),P (Perempuan),Jumlah\nSMA,SMAN 1 Contoh,20400000,MIPA,2025,20,50,70\n',S:'NISN,Nama,TahunLulus,Status,Domisili\n0012345678,Budi Santoso,2025,Bekerja,Dalam DIY\n'}[k];
