@@ -6,42 +6,254 @@
 <title>Pendataan Lulusan Jenjang SMA/SMK Kab. Gunungkidul</title>
 <script>
 /* =====================================================
-   HOSTING DI GITHUB PAGES
-   Di Google Apps Script, google.script.run sudah ada dan blok ini tidak melakukan apa-apa.
-   Di GitHub Pages, google.script.run ditiru: setiap pemanggilan dikirim ke web app Apps Script (doPost).
-   ISI TRACER_API_URL dengan alamat web app (berakhiran /exec) dari Deploy > Manage deployments.
+   HUBUNGAN FIREBASE (menggantikan penghubung Apps Script)
+   google.script.run ditiru: nama fungsi sama, tetapi data dibaca/ditulis ke Firestore.
+   ISI FB_CONFIG dari Firebase Console > Project settings > Your apps (aplikasi web).
+   Akun dibuat lewat skrip admin.js (lihat README). Username dipetakan ke email username@gk.local.
 ===================================================== */
 (function () {
-  var TRACER_API_URL = 'https://script.google.com/macros/s/AKfycbwljAxwjiyMqD-07amjZVrwriomJYsPSEb591VRHSgwemQDC44dG7WtrqdD_IaefT8Maw/exec';
-  var MAKS_BERSAMAAN = 6;
+  var FB_CONFIG = { apiKey: 'AIzaSyAqUtewkViOsY9Zp2r0QrbsiHTbblcfHb4', authDomain: 'pendataan-lulusan-gk-b9516.firebaseapp.com', projectId: 'pendataan-lulusan-gk-b9516', appId: '1:1069339094275:web:687cb093bd77a07fa78d36' };
+  var DOMAIN = '@gk.local', BASE = 'https://www.gstatic.com/firebasejs/10.14.1/';
+  if (window.google && google.script && google.script.run) return;
 
-  if (window.google && google.script && google.script.run) return;   // sedang berjalan di Apps Script
+  var STATUS = ['Melanjutkan Pendidikan', 'Bekerja', 'Berwirausaha', 'Mengikuti Pendidikan Nonformal/Pelatihan', 'Belum Bekerja'];
+  var DOM = ['Dalam DIY', 'Luar DIY'];
+  var ALIAS = { KULIAH: STATUS[0], MELANJUTKAN: STATUS[0], MELANJUTKANKULIAH: STATUS[0], WIRAUSAHA: STATUS[2], PELATIHAN: STATUS[3], NONFORMAL: STATUS[3], MENGANGGUR: STATUS[4], BELUMBEKERJA: STATUS[4] };
 
-  var antri = [], jalan = 0;
-  function giliran() {
-    while (jalan < MAKS_BERSAMAAN && antri.length) { jalan++; antri.shift()(); }
+  var clean = function (v) { return String(v == null ? '' : v).replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g, '').replace(/\s+/g, ' ').trim(); };
+  var norm = function (s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); };
+  var npsn = function (v) { return String(v == null ? '' : v).replace(/\D/g, ''); };
+  var nisn = function (v) { var d = String(v == null ? '' : v).replace(/\D/g, ''); return (d && d.length < 10) ? ('0000000000' + d).slice(-10) : d; };
+  var tel = function (v) { return String(v == null ? '' : v).replace(/[^0-9+]/g, ''); };
+  var num = function (v) { var x = String(v == null ? '' : v).trim(); if (x === '') return ''; var n = Number(x); return isFinite(n) ? n : ''; };
+  var statusNorm = function (v) { var k = norm(v); if (!k) return ''; for (var i = 0; i < STATUS.length; i++) if (norm(STATUS[i]) === k) return STATUS[i]; return ALIAS[k] || ''; };
+  var domNorm = function (v) { var k = norm(v); return (k === 'DALAMDIY' || k === 'DALAM' || k === 'DIY') ? DOM[0] : (k === 'LUARDIY' || k === 'LUAR') ? DOM[1] : ''; };
+  var sekarang = function () { return new Date().toISOString(); };
+  var uuid = function () { return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)); };
+
+  var F, PROF = null;
+  var siap = (async function () {
+    if (/^ISI_/.test(FB_CONFIG.apiKey)) throw new Error('firebaseConfig belum diisi di index.html (FB_CONFIG).');
+    var m = await Promise.all([import(BASE + 'firebase-app.js'), import(BASE + 'firebase-auth.js'), import(BASE + 'firebase-firestore.js')]);
+    var app = m[0].initializeApp(FB_CONFIG);
+    F = Object.assign({}, m[1], m[2]);
+    F.auth = m[1].getAuth(app); F.db = m[2].getFirestore(app);
+    await F.auth.authStateReady();
+  })();
+  var C = function (n) { return F.collection(F.db, n); };
+  var D = function (n, id) { return F.doc(F.db, n, String(id)); };
+  var obj = function (d) { return Object.assign({}, d.data(), { ID: d.id, _r: 0 }); };
+
+  async function profil() {
+    await siap;
+    var u = F.auth.currentUser;
+    if (!u) throw new Error('Sesi habis, silakan login ulang.');
+    if (!PROF || PROF.uid !== u.uid) {
+      var s = await F.getDoc(D('users', u.uid));
+      if (!s.exists() || s.data().aktif === false) { await F.signOut(F.auth); PROF = null; throw new Error('Akun dinonaktifkan. Hubungi admin dinas.'); }
+      PROF = Object.assign({ uid: u.uid }, s.data());
+    }
+    return PROF;
   }
-  function kirim(nama, args, ok, gagal, user) {
-    antri.push(function () {
-      var selesai = function () { jalan--; giliran(); };
-      var galat = function (e) { selesai(); if (typeof gagal === 'function') gagal(e, user); else console.error('[Tracer] ' + nama + ':', e); };
-      if (!TRACER_API_URL || /^ISI_/.test(TRACER_API_URL)) { galat(new Error('Alamat API belum diisi di index.html (TRACER_API_URL).')); return; }
-      fetch(TRACER_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // text/plain: tanpa preflight CORS
-        body: JSON.stringify({ fn: nama, args: args }),
-        redirect: 'follow'
-      }).then(function (r) { return r.text(); }).then(function (t) {
+  var wajibAdmin = function (p) { if (p.role !== 'admin') throw new Error('Hanya admin yang boleh melakukan ini.'); };
+  var bukanAlumni = function (p) { if (p.role === 'alumni') throw new Error('Tidak punya akses.'); };
+  async function muatAlumni(p) {   // admin: semua; operator: hanya NPSN sekolahnya
+    if (p.role === 'admin') return (await F.getDocs(C('alumni'))).docs;
+    if (!p.npsn) throw new Error('Akun belum memiliki NPSN. Hubungi admin dinas.');
+    return (await F.getDocs(F.query(C('alumni'), F.where('NPSN', '==', p.npsn)))).docs;
+  }
+  async function tulis(ops) {      // batch Firestore maksimal 500 operasi; dipakai 400
+    for (var i = 0; i < ops.length; i += 400) {
+      var b = F.writeBatch(F.db); ops.slice(i, i + 400).forEach(function (f) { f(b); }); await b.commit();
+    }
+  }
+
+  var FN = {
+    login: async function (username, password) {
+      await siap;
+      var uname = clean(username).toLowerCase();
+      if (/^\d+$/.test(uname)) uname = nisn(uname);
+      try { await F.signInWithEmailAndPassword(F.auth, uname + DOMAIN, String(password == null ? '' : password)); }
+      catch (e) { throw new Error(/too-many/.test(e.code) ? 'Terlalu banyak percobaan gagal. Coba lagi beberapa menit lagi.' : 'Username atau password salah.'); }
+      PROF = null; var p = await profil(), user, data = null;
+      if (p.role === 'alumni') {
+        var a = await F.getDoc(D('alumni', p.alumniId));
+        if (!a.exists()) throw new Error('Data alumni tidak ditemukan. Hubungi admin dinas.');
+        user = { username: p.nisn, sekolah: a.data().Sekolah, npsn: a.data().NPSN || '', role: 'alumni', id: a.id, row: 0, nama: a.data().Nama, defaultPw: p.defaultPw !== false };
+        data = [obj(a)];
+      } else user = { username: p.username, sekolah: p.sekolah, role: p.role, npsn: p.npsn || '' };
+      return { token: p.uid, user: user, data: data };
+    },
+    logout: async function () { await siap; PROF = null; await F.signOut(F.auth); },
+
+    getAlumni: async function () {
+      var p = await profil();
+      if (p.role === 'alumni') { var a = await F.getDoc(D('alumni', p.alumniId)); return a.exists() ? [obj(a)] : []; }
+      return (await muatAlumni(p)).map(obj);
+    },
+    getRekap: async function () {
+      var p = await profil(); if (p.role === 'alumni') return [];
+      var q = p.role === 'admin' ? C('rekap') : F.query(C('rekap'), F.where('NPSN', '==', p.npsn || '-'));
+      return (await F.getDocs(q)).docs.map(function (d) { return d.data(); });
+    },
+
+    updateStatus: async function (t, id, status, instansi, detail, rowHint, domisili) {
+      var p = await profil(); bukanAlumni(p);
+      if (STATUS.indexOf(status) < 0) throw new Error('Pilih status terlebih dahulu.');
+      var upd = { Status: status, Instansi: clean(instansi), Detail: clean(detail), Diperbarui: sekarang(), Operator: p.username };
+      if (domisili !== undefined) { domisili = clean(domisili); if (domisili && DOM.indexOf(domisili) < 0) throw new Error('Domisili hanya boleh Dalam DIY atau Luar DIY.'); upd.Domisili = domisili; }
+      await F.updateDoc(D('alumni', id), upd); return true;
+    },
+    updateStatusBatch: async function (t, items) {
+      var p = await profil(); bukanAlumni(p);
+      var ok = [], gagal = [], valid = [];
+      (items || []).forEach(function (it) {
+        var dom = clean(it.domisili);
+        if (STATUS.indexOf(String(it.status || '')) < 0) return gagal.push({ id: it.id, alasan: 'Pilih status terlebih dahulu.' });
+        if (dom && DOM.indexOf(dom) < 0) return gagal.push({ id: it.id, alasan: 'Domisili hanya boleh Dalam DIY atau Luar DIY.' });
+        valid.push({ id: it.id, f: { Status: it.status, Instansi: '', Detail: '', Diperbarui: sekarang(), Operator: p.username, Domisili: dom } });
+      });
+      for (var i = 0; i < valid.length; i += 400) {
+        var potong = valid.slice(i, i + 400), b = F.writeBatch(F.db);
+        potong.forEach(function (v) { b.update(D('alumni', v.id), v.f); });
+        try { await b.commit(); potong.forEach(function (v) { ok.push(v.id); }); }
+        catch (e) { potong.forEach(function (v) { gagal.push({ id: v.id, alasan: e.code === 'permission-denied' ? 'Tidak punya akses.' : 'Gagal menyimpan.' }); }); }
+      }
+      return { ok: ok, gagal: gagal };
+    },
+    deleteAlumni: async function (t, id) { var p = await profil(); wajibAdmin(p); await F.deleteDoc(D('alumni', id)); return true; },
+    simpanSaya: async function (t, status, instansi, detail, kota, telepon, domisili) {
+      var p = await profil(); if (p.role !== 'alumni') throw new Error('Fitur ini khusus alumni.');
+      if (STATUS.indexOf(status) < 0) throw new Error('Pilih status terlebih dahulu.');
+      var upd = { Status: status, Instansi: clean(instansi), Detail: clean(detail), Kota: clean(kota), Telepon: tel(telepon), Diperbarui: sekarang(), Operator: 'Alumni (mandiri)' };
+      if (domisili !== undefined) { domisili = clean(domisili); if (domisili && DOM.indexOf(domisili) < 0) throw new Error('Domisili hanya boleh Dalam DIY atau Luar DIY.'); upd.Domisili = domisili; }
+      await F.updateDoc(D('alumni', p.alumniId), upd); return true;
+    },
+    gantiSandi: async function (t, lama, baru) {
+      var p = await profil(), u = F.auth.currentUser;
+      lama = String(lama == null ? '' : lama); baru = String(baru == null ? '' : baru);
+      if (baru.length < 6) throw new Error('Password baru minimal 6 karakter.');
+      if (p.role === 'alumni' && nisn(baru) === p.nisn) throw new Error('Password baru tidak boleh sama dengan NISN.');
+      try { await F.reauthenticateWithCredential(u, F.EmailAuthProvider.credential(u.email, lama)); } catch (e) { throw new Error('Password lama salah.'); }
+      await F.updatePassword(u, baru);
+      if (p.role === 'alumni' && p.defaultPw !== false) { await F.updateDoc(D('users', p.uid), { defaultPw: false }); PROF.defaultPw = false; }
+      return true;
+    },
+
+    listOperator: async function () {
+      var p = await profil(); wajibAdmin(p);
+      return (await F.getDocs(F.query(C('users'), F.where('role', 'in', ['admin', 'operator'])))).docs.map(function (d) {
+        var x = d.data(); return { Username: x.username, Sekolah: x.sekolah, Role: x.role, Aktif: x.aktif !== false, NPSN: x.npsn || '' };
+      });
+    },
+    opSetAktif: async function (t, username, aktif) {
+      var p = await profil(); wajibAdmin(p);
+      if (String(username).toLowerCase() === String(p.username).toLowerCase()) throw new Error('Tidak bisa menonaktifkan akun Anda sendiri.');
+      var s = await F.getDocs(F.query(C('users'), F.where('username', '==', String(username).toLowerCase())));
+      if (s.empty) throw new Error('Akun tidak ditemukan.');
+      await F.updateDoc(s.docs[0].ref, { aktif: !!aktif }); return true;
+    },
+    // Dikerjakan lewat skrip admin.js (Firebase Auth tidak mengizinkan dari browser)
+    opTambah: async function () { throw new Error('Tambah akun operator dilakukan lewat skrip admin.js (perintah "operator"). Lihat README.'); },
+    importOperator: async function () { throw new Error('Impor operator dilakukan lewat skrip admin.js (perintah "operator"). Lihat README.'); },
+    opResetSandi: async function () { throw new Error('Reset password operator dilakukan lewat skrip admin.js (perintah "reset"). Lihat README.'); },
+    resetSandi: async function () { throw new Error('Reset password alumni dilakukan lewat skrip admin.js (perintah "reset"). Lihat README.'); },
+    lengkapiNpsn: async function () { throw new Error('Fitur ini belum tersedia di versi Firebase.'); },
+
+    importAlumni: async function (t, rows, reset, dry) {
+      var p = await profil(); wajibAdmin(p);
+      var have = {}, kunci = function (n, sk, th, nm) { return n ? 'N|' + n : 'X|' + norm(sk) + '|' + th + '|' + norm(nm); };
+      (await F.getDocs(C('alumni'))).forEach(function (d) { var r = d.data(); have[kunci(nisn(r.NISN), r.Sekolah, r.TahunLulus, r.Nama)] = r.Sekolah; });
+      var ops = (await F.getDocs(F.query(C('users'), F.where('role', '==', 'operator')))).docs.map(function (d) { return { n: npsn(d.data().npsn), s: norm(d.data().sekolah) }; });
+      var out = [], masalah = [], peringatan = [], tanpaOp = {};
+      rows.forEach(function (r) {
+        var n = r._n || '', sk = clean(r.Sekolah), nm = clean(r.Nama), th = Number(r.TahunLulus);
+        var rawN = String(r.NISN == null ? '' : r.NISN).replace(/\D/g, ''), ns = nisn(r.NISN), np = npsn(r.NPSN), info = nm + (sk ? ' — ' + sk : '');
+        var tolak = function (a) { masalah.push({ n: n, alasan: a, info: info }); };
+        if (!sk) return tolak('Nama sekolah kosong');
+        if (!nm) return tolak('Nama siswa kosong');
+        if (!(th >= 1990 && th <= 2100)) return tolak('Tahun lulus tidak valid: "' + clean(r.TahunLulus) + '"');
+        if (rawN.length > 10 || (rawN.length > 0 && rawN.length < 6)) return tolak('NISN tidak valid: "' + clean(r.NISN) + '" (harus 10 digit)');
+        var k = kunci(ns, sk, th, nm);
+        if (have[k]) return tolak(ns ? 'NISN ' + ns + ' sudah ada (' + have[k] + ')' : 'Siswa yang sama sudah ada');
+        have[k] = sk;
+        if (!ns) peringatan.push({ n: n, alasan: 'NISN kosong, alumni ini tidak bisa login sendiri', info: info });
+        if (np && np.length !== 8) { peringatan.push({ n: n, alasan: 'NPSN "' + np + '" tidak 8 digit, diabaikan', info: info }); np = ''; }
+        if (!np) peringatan.push({ n: n, alasan: 'NPSN kosong: data tidak akan terlihat oleh operator sekolah', info: info });
+        if (!ops.some(function (o) { return (o.n && np) ? o.n === np : o.s === norm(sk); })) tanpaOp[sk] = 1;
+        out.push({ Sekolah: sk, TahunLulus: th, NISN: ns, Nama: nm, JK: clean(r.JK).toUpperCase().charAt(0), Status: '', Instansi: '', Detail: '', Kota: clean(r.Kota), Telepon: tel(r.Telepon), Diperbarui: '', Operator: '', NPSN: np, Domisili: '' });
+      });
+      if (!dry && out.length) await tulis(out.map(function (o) { return function (b) { b.set(D('alumni', uuid()), o); }; }));
+      return { tambah: out.length, lewat: masalah.length, masalah: masalah, peringatan: peringatan, tanpaOperator: Object.keys(tanpaOp) };
+    },
+    importStatus: async function (t, rows, reset, dry) {
+      var p = await profil(); bukanAlumni(p);
+      var docs = await muatAlumni(p), byN = {}, byName = {}, masalah = [], peringatan = [], seen = {}, upd = [], ok = 0, belum = 0;
+      docs.forEach(function (d) { var r = d.data(), ns = nisn(r.NISN); if (ns && byN[ns] === undefined) byN[ns] = d; (byName[norm(r.Nama) + '|' + r.TahunLulus] = byName[norm(r.Nama) + '|' + r.TahunLulus] || []).push(d); });
+      rows.forEach(function (r) {
+        var nr = r._n || '', nm = clean(r.Nama), th = Number(r.TahunLulus), rawN = String(r.NISN == null ? '' : r.NISN).replace(/\D/g, ''), ns = nisn(r.NISN);
+        var info = (nm || ns || '(tanpa nama)') + (r.Status ? ' → ' + clean(r.Status) : '');
+        var tolak = function (a) { masalah.push({ n: nr, alasan: a, info: info }); };
+        var kurang = []; if (!clean(r.Status)) kurang.push('Status'); if (!clean(r.Domisili)) kurang.push('Domisili');
+        if (kurang.length) { belum++; return tolak(kurang.join(' dan ') + ' belum diisi'); }
+        var st = statusNorm(r.Status); if (!st) return tolak('Status tidak dikenali: "' + clean(r.Status) + '"');
+        var dom = domNorm(r.Domisili); if (!dom) return tolak('Domisili tidak dikenali: "' + clean(r.Domisili) + '" (isi Dalam DIY atau Luar DIY)');
+        if (rawN.length > 10 || (rawN.length > 0 && rawN.length < 6)) return tolak('NISN tidak valid: "' + clean(r.NISN) + '"');
         var d;
-        try { d = JSON.parse(t); } catch (e) { throw new Error('Balasan server tidak valid. Pastikan web app dideploy dengan akses Anyone.'); }
-        if (!d || d.ok !== true) throw new Error((d && d.error) || 'Galat server.');
-        return d.data === undefined ? null : d.data;
-      }).then(function (data) {
-        selesai();
-        if (typeof ok === 'function') setTimeout(function () { ok(data, user); }, 0);
-      }, galat);
-    });
-    giliran();
+        if (ns) { d = byN[ns]; if (!d) return tolak(p.role === 'admin' ? 'NISN ' + ns + ' tidak ditemukan' : 'NISN ' + ns + ' tidak ditemukan di data sekolah Anda'); }
+        else {
+          if (!norm(nm) || !(th >= 1990 && th <= 2100)) return tolak('NISN kosong; isi Nama dan TahunLulus agar siswa bisa dicocokkan');
+          var list = byName[norm(nm) + '|' + th];
+          if (!list) return tolak('Siswa tidak ditemukan (nama + tahun lulus)');
+          if (list.length > 1) return tolak('Ada lebih dari satu siswa dengan nama dan tahun lulus yang sama; gunakan NISN');
+          d = list[0];
+        }
+        if (seen[d.id]) return tolak('Siswa yang sama muncul lebih dari satu kali dalam file');
+        seen[d.id] = 1;
+        var lama = String(d.data().Status || '');
+        if (ns && nm && norm(nm) !== norm(d.data().Nama)) peringatan.push({ n: nr, alasan: 'Nama di file berbeda dengan data (' + clean(d.data().Nama) + '); dicocokkan lewat NISN', info: info });
+        if (lama && lama !== st) peringatan.push({ n: nr, alasan: 'Status lama "' + lama + '" diganti', info: info });
+        ok++; upd.push({ ref: d.ref, f: { Status: st, Instansi: '', Detail: '', Diperbarui: sekarang(), Operator: p.username, Domisili: dom } });
+      });
+      if (!dry && belum) throw new Error('Impor dibatalkan: ' + belum + ' baris belum lengkap (Status/Domisili kosong). Lengkapi file lalu coba lagi.');
+      if (!dry && upd.length) await tulis(upd.map(function (u) { return function (b) { b.update(u.ref, u.f); }; }));
+      return { tambah: ok, lewat: masalah.length, masalah: masalah, peringatan: peringatan, belumLengkap: belum };
+    },
+    importRekap: async function (t, rows, reset, dry) {
+      var p = await profil(); wajibAdmin(p);
+      var out = [], masalah = [], peringatan = [];
+      rows.forEach(function (r) {
+        var n = r._n || '', sk = clean(r.Sekolah), th = num(r.Tahun), L = num(r.L), P = num(r.P), J = num(r.Jumlah), np = npsn(r.NPSN);
+        var info = sk + (r.Jurusan ? ' — ' + clean(r.Jurusan) : '') + (th !== '' ? ' (' + th + ')' : '');
+        var tolak = function (a) { masalah.push({ n: n, alasan: a, info: info }); };
+        if (!sk) return tolak('Nama sekolah kosong');
+        if (/\.xlsx?$/i.test(sk)) return tolak('Nama sekolah berisi nama file; perbaiki di file sumber');
+        if (th === '' || th < 1990 || th > 2100) return tolak('Tahun tidak valid: "' + clean(r.Tahun) + '"');
+        if (L !== '' && P !== '' && J !== '' && L + P !== J) peringatan.push({ n: n, alasan: 'L + P (' + (L + P) + ') tidak sama dengan Jumlah (' + J + ')', info: info });
+        else if (J === '' && (L === '' || P === '')) peringatan.push({ n: n, alasan: 'Jumlah kosong dan L/P tidak lengkap', info: info });
+        if (np && np.length !== 8) { peringatan.push({ n: n, alasan: 'NPSN "' + np + '" tidak 8 digit, diabaikan', info: info }); np = ''; }
+        if (!np) peringatan.push({ n: n, alasan: 'NPSN kosong: rekap tidak akan terlihat oleh operator sekolah', info: info });
+        out.push({ Jenjang: clean(r.Jenjang), Sekolah: sk, NPSN: np, Jurusan: clean(r.Jurusan), Tahun: th, L: L, P: P, Jumlah: J });
+      });
+      if (!dry) {
+        var ops = [];
+        if (reset) (await F.getDocs(C('rekap'))).forEach(function (d) { ops.push(function (b) { b.delete(d.ref); }); });
+        out.forEach(function (o) { ops.push(function (b) { b.set(D('rekap', uuid()), o); }); });
+        await tulis(ops);
+      }
+      return { tambah: out.length, lewat: masalah.length, masalah: masalah, peringatan: peringatan };
+    }
+  };
+
+  function kirim(nama, args, ok, gagal, user) {
+    var galat = function (e) {
+      var m = (e && e.code === 'permission-denied') ? new Error('Tidak punya akses.') : (e instanceof Error ? e : new Error(String(e)));
+      if (typeof gagal === 'function') gagal(m, user); else console.error('[Firebase] ' + nama + ':', e);
+    };
+    if (!FN[nama]) return galat(new Error('Fungsi tidak tersedia: ' + nama));
+    Promise.resolve().then(function () { return FN[nama].apply(null, args); }).then(function (d) {
+      if (typeof ok === 'function') setTimeout(function () { ok(d === undefined ? null : d, user); }, 0);
+    }, galat);
   }
   function bangun(ok, gagal, user) {
     return new Proxy({}, { get: function (_, nama) {
