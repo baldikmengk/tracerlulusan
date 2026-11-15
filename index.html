@@ -377,7 +377,7 @@ const ST=['Melanjutkan Pendidikan','Bekerja','Berwirausaha','Mengikuti Pendidika
 const BB='Belum Bekerja';
 const DOM=['Dalam DIY','Luar DIY'];
 const domCell=v=>`<select class="dm"><option value="">— pilih —</option>${DOM.map(x=>`<option${x===v?' selected':''}>${x}</option>`).join('')}</select>`;
-let T='',U=null,D=[],R=[],PRE=null;
+let T='',U=null,D=[],R=[],PRE=null,PRER=null;
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
 T=ls.get('ts_t')||'';
 const $=id=>document.getElementById(id);
@@ -432,13 +432,13 @@ async function doLogin(){
             $('msg').textContent='Akun ini bukan akun '+LTAB[LR].nama+'. Silakan pilih tab yang sesuai.';
             bl.disabled=false;bl.textContent='Masuk';return;
         }
-        T=r.token;U=r.user;PRE=r.data||null;
+        T=r.token;U=r.user;PRE=r.data||null;PRER=Array.isArray(r.rekap)?r.rekap:null;
         ls.set('ts_t',T);ls.set('ts_u',JSON.stringify(U));await start();}
     catch(e){$('msg').textContent=e.message||'Login gagal, coba lagi.'}
     bl.disabled=false;bl.textContent='Masuk';
 }
 function doLogout(){Object.keys(PCH).forEach(k=>delete PCH[k]);
-    PRE=null;busy('');
+    PRE=null;PRER=null;busy('');
     if(T)call('logout',T).catch(()=>{});
     T='';U=null;D=[];R=[];ls.del('ts_t');ls.del('ts_u');
     $('app').classList.add('hide');$('login').classList.remove('hide');
@@ -454,7 +454,17 @@ async function start(){
     if(alm){fillSaya();tab(4)}else tab(1);
 }
 async function load(){
-    try{if(PRE){D=PRE;R=[];PRE=null}else{D=await call('getAlumni',T);R=U.role==='alumni'?[]:await call('getRekap',T).catch(()=>[])}}catch(e){alert(e.message);if(/Sesi/.test(e.message))doLogout();return}
+    try{
+        const alm=U.role==='alumni';
+        if(PRE){                                   // data sudah ikut dikirim saat login: tidak perlu memanggil server lagi
+            D=PRE;PRE=null;
+            R=alm?[]:(PRER||await call('getRekap',T).catch(()=>[]));
+            PRER=null;
+        }else{                                     // alumni dan rekap diminta bersamaan, bukan bergantian
+            const hasil=await Promise.all([call('getAlumni',T),alm?Promise.resolve([]):call('getRekap',T).catch(()=>[])]);
+            D=hasil[0];R=hasil[1];
+        }
+    }catch(e){alert(e.message);if(/Sesi/.test(e.message))doLogout();return}
     // Tahun pada filter = tahun alumni terdata + tahun pada rekap lulusan (termasuk dari aplikasi Laporan Kelulusan)
     const yrs=[...new Set(D.map(d=>Number(d.TahunLulus)).concat(R.map(r=>Number(r.Tahun))))].filter(Boolean).sort((a,b)=>b-a);
     const opt='<option value="">Semua tahun</option>'+yrs.map(y=>`<option>${y}</option>`).join('');
