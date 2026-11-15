@@ -13,6 +13,7 @@
 ===================================================== */
 (function () {
   var FB_CONFIG = { apiKey: 'AIzaSyAqUtewkViOsY9Zp2r0QrbsiHTbblcfHb4', authDomain: 'pendataan-lulusan-gk-b9516.firebaseapp.com', projectId: 'pendataan-lulusan-gk-b9516', appId: '1:1069339094275:web:687cb093bd77a07fa78d36' };
+  var ALUMNI_BUKA = false;   // ubah menjadi true saat tahap login alumni dibuka
   var DOMAIN = '@gk.local', BASE = 'https://www.gstatic.com/firebasejs/10.14.1/';
   if (window.google && google.script && google.script.run) return;
 
@@ -86,6 +87,7 @@
       }
       if (!berhasil) throw new Error(/too-many/.test(kode) ? 'Terlalu banyak percobaan gagal. Coba lagi beberapa menit lagi.' : 'Username atau password salah.');
       PROF = null; var p = await profil(), user, data = null;
+      if (p.role === 'alumni' && !ALUMNI_BUKA) { await F.signOut(F.auth); PROF = null; throw new Error('Login alumni belum dibuka. Silakan hubungi operator sekolah Anda.'); }
       if (p.role === 'alumni') {
         var a = await F.getDoc(D('alumni', p.alumniId));
         if (!a.exists()) throw new Error('Data alumni tidak ditemukan. Hubungi admin dinas.');
@@ -449,7 +451,6 @@ header .th{padding:6px 10px;font-size:15px;line-height:1}
             <div class="seg" role="tablist" aria-label="Masuk sebagai">
                 <button type="button" role="tab" class="on" data-r="admin" onclick="pilihPeran('admin')">Admin</button>
                 <button type="button" role="tab" data-r="sekolah" onclick="pilihPeran('sekolah')">Satuan Pendidikan</button>
-                <button type="button" role="tab" data-r="alumni" onclick="pilihPeran('alumni')">Alumni</button>
             </div>
             <div class="lhint" id="lh"></div>
             <div class="f"><label for="u" id="lu">Username</label>
