@@ -402,6 +402,26 @@ header .th{padding:6px 10px;font-size:15px;line-height:1}
 [data-theme="dark"] .logo{border-color:#162033}
 [data-theme="dark"] .lg{background:linear-gradient(135deg,#050b1f 0%,#13306f 55%,#0b6b73 100%)}
 }
+
+/* ===== Menu samping + dashboard infografis ===== */
+.kpis .hero{display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding:6px 4px 14px}
+.ring{position:relative;width:150px;height:150px;flex:0 0 auto}.ring svg{width:100%;height:100%}
+.rg0,.rg1{fill:none;stroke-width:12}.rg0{stroke:var(--l)}.rg1{stroke:#16a34a;stroke-linecap:round}
+.rt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}.rt b{font-size:26px}.rt span{font-size:11px;color:var(--m)}
+.hn{flex:1;min-width:240px;display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.hn>div{background:var(--bg);border:1px solid var(--l);border-radius:12px;padding:12px}.hn span{font-size:12px;color:var(--m);display:block}.hn b{font-size:30px;line-height:1.2;display:block}
+.sts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.k2{position:relative;background:var(--bg);border:1px solid var(--l);border-top:4px solid var(--c);border-radius:12px;padding:12px}
+.k2 i{font-style:normal;font-size:22px;position:absolute;right:10px;top:8px;opacity:.9}.k2 b{font-size:28px;display:block;color:var(--c)}
+.k2 span{font-size:12px;display:block;min-height:32px;font-weight:600}.k2 em{font-style:normal;font-size:11px;color:var(--m)}
+.mb{height:7px;background:var(--l);border-radius:4px;overflow:hidden;margin:6px 0 4px}.mb div{height:100%;background:var(--c);border-radius:4px}
+@media(min-width:900px){
+main:has(>#tabs:not(.hide)){display:grid;grid-template-columns:220px minmax(0,1fr);column-gap:18px;align-items:start;max-width:1360px}
+main:has(>#tabs:not(.hide))>*:not(.tabs){grid-column:2}
+main:has(>#tabs:not(.hide))>.tabs{grid-column:1;grid-row:1/span 30;position:sticky;top:14px;flex-direction:column;margin:0;padding:10px;background:var(--c);border:1px solid var(--l);border-radius:12px}
+main:has(>#tabs:not(.hide))>.tabs button{width:100%;text-align:left;border:0;background:transparent;padding:11px 12px;border-radius:8px;font-weight:600;color:var(--t)}
+main:has(>#tabs:not(.hide))>.tabs button.on{background:var(--b);color:#fff}
+}
 </style>
 </head>
 <body>
@@ -447,16 +467,16 @@ header .th{padding:6px 10px;font-size:15px;line-height:1}
     <header><b>Pendataan Lulusan — <span id="sk"></span></b><span><button id="thH" class="th" onclick="toggleTheme()" aria-label="Ganti mode gelap atau terang">🌙</button> <button onclick="tab(5)">Ganti Password</button> <button onclick="doLogout()">Keluar</button></span></header>
     <main>
         <div class="tabs" id="tabs">
-            <button id="t1" class="on" onclick="tab(1)">Dashboard</button>
-            <button id="t2" onclick="tab(2)">Isi Status Alumni</button>
-            <button id="t3" class="hide" onclick="tab(3)">Impor Excel</button>
-            <button id="t7" onclick="tab(7)">Laporan</button>
-            <button id="t6" class="hide" onclick="tab(6)">Kelola Operator</button>
+            <button id="t1" class="on" onclick="tab(1)">📊 Dashboard</button>
+            <button id="t2" onclick="tab(2)">✏️ Isi Status Alumni</button>
+            <button id="t3" class="hide" onclick="tab(3)">📥 Impor Excel</button>
+            <button id="t7" onclick="tab(7)">📄 Laporan</button>
+            <button id="t6" class="hide" onclick="tab(6)">👤 Kelola Operator</button>
         </div>
 
         <section id="v1">
             <div class="card"><div class="row"><div><label>Tahun lulus</label><select id="fy" onchange="renderDash()"></select></div></div>
-                <div class="stat" id="stat"></div></div>
+                <div class="kpis" id="stat"></div></div>
             <div class="card"><b>Grafik status alumni</b> <small>(dari alumni yang sudah mengisi; lingkaran mengikuti filter tahun di atas)</small>
                 <div class="cols" style="margin-top:12px"><div id="chDonut"></div><div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Komposisi status per tahun lulus</div><div id="chYear"></div></div></div></div>
             <div class="card sc">
@@ -694,9 +714,12 @@ function home(){tab(U&&U.role==='alumni'?4:1)}
 const done=d=>ST.indexOf(d.Status)>=0;
 function cnt(rows){const c={};ST.forEach(s=>c[s]=0);rows.forEach(r=>{if(c[r.Status]!=null)c[r.Status]++});return c}
 
+const pct=(a,b)=>{if(!b)return '0';const p=a*100/b;return (p>0&&p<1?p.toFixed(2):p<10?p.toFixed(1):p.toFixed(0)).replace('.',',')};
+const SCOL=['#2563eb','#16a34a','#f59e0b','#8b5cf6','#ef4444'],SICO=['🎓','💼','🏪','📚','🔍'];
 function renderDash(){
     const y=$('fy').value,rows=y?D.filter(d=>String(d.TahunLulus)===y):D,c=cnt(rows),n=rows.length,f=rows.filter(done).length;
-    $('stat').innerHTML=`<div><b>${n}</b><span>Total alumni</span></div><div><b class="ok">${f}</b><span>Sudah diisi (${n?(f*100/n).toFixed(0):0}%)</span></div><div><b class="warn">${n-f}</b><span>Belum diisi</span></div>`+ST.map(s=>`<div><b>${c[s]}</b><span>${s}</span></div>`).join('');
+    const pc=n?Math.min(f*100/n,100):0,RR=52,CC=2*Math.PI*RR;
+    $('stat').innerHTML=`<div class="hero"><div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="${RR}" class="rg0"/><circle cx="60" cy="60" r="${RR}" class="rg1" stroke-dasharray="${CC*pc/100} ${CC}" transform="rotate(-90 60 60)"/></svg><div class="rt"><b>${pct(f,n)}%</b><span>sudah diisi</span></div></div><div class="hn"><div><span>👥 Total alumni</span><b>${n}</b></div><div><span>✅ Sudah diisi</span><b class="ok">${f}</b></div><div><span>⏳ Belum diisi</span><b class="warn">${n-f}</b></div></div></div><div class="sts">`+ST.map((st,k)=>`<div class="k2" style="--c:${SCOL[k]}"><i>${SICO[k]}</i><b>${c[st]}</b><span>${esc(st)}</span><div class="mb"><div style="width:${f?c[st]*100/f:0}%"></div></div><em>${pct(c[st],f)}% dari yang terisi</em></div>`).join('')+'</div>';
     $('bars').innerHTML=ST.map(s=>{const p=f?(c[s]*100/f):0;let x='';
         return `<div>${s} — ${c[s]} (${p.toFixed(1)}%)<div class="bar" style="margin-bottom:${x?2:10}px"><i style="width:${p}%"></i></div>${x?'<div style="margin-bottom:10px">'+x+'</div>':''}</div>`}).join('');
     const yrs=[...new Set(D.map(d=>d.TahunLulus))].sort((a,b)=>b-a);
@@ -706,7 +729,7 @@ function renderDash(){
     if(U.role==='admin'){
         const sks=[...new Set(D.map(d=>d.Sekolah))].sort();
         $('rekapSek').innerHTML='<tr><th>Sekolah</th><th>Total</th><th>Terisi</th><th>Progres</th></tr>'+sks.map(s=>{const r=D.filter(d=>d.Sekolah===s),t=r.filter(done).length,p=r.length?t*100/r.length:0;
-            return `<tr><td>${esc(s)}</td><td>${r.length}</td><td>${t}</td><td style="min-width:140px">${p.toFixed(0)}%<div class="bar" style="margin:2px 0 0"><i style="width:${p}%"></i></div></td></tr>`}).join('');
+            return `<tr><td>${esc(s)}</td><td>${r.length}</td><td>${t}</td><td style="min-width:140px">${pct(t,r.length)}%<div class="bar" style="margin:2px 0 0"><i style="width:${p}%"></i></div></td></tr>`}).join('');
     }
 }
 
