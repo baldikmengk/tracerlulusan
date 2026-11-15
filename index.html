@@ -340,6 +340,26 @@ tr.chg td{background:#fffbeb}tr.bad td{background:#fee2e2}tr.okk td{background:#
 .dn{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.leg{flex:1;min-width:200px}
 .lg2{display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0}.lg2 i{width:12px;height:12px;border-radius:3px;flex:none}.lg2 span{flex:1}.lg2 b{min-width:28px;text-align:right}.lg2 small{width:48px;text-align:right}
 .sy{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}.sy span{width:42px}.sb{flex:1;height:18px;background:#e5e7eb;border-radius:5px;overflow:hidden;display:flex}.sb i{display:block;height:100%}.sb em{font-size:11px;color:var(--m);padding:1px 6px;font-style:normal}.sy small{width:64px;text-align:right}
+/* ---- Infografis dashboard ---- */
+.hero{display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center;background:linear-gradient(135deg,#0a2463 0%,#1a56db 60%,#0e9fa8 100%);color:#fff;border-radius:16px;padding:20px 24px;margin-bottom:14px;box-shadow:0 10px 24px rgba(26,86,219,.25);position:relative;overflow:hidden}
+.hero:before{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.08)}
+.hero h3{margin:0 0 4px;font-size:18px}.hero p{margin:0 0 14px;font-size:14px;opacity:.9}
+.hero .pills{display:flex;gap:10px;flex-wrap:wrap}
+.hero .pills div{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:8px 14px;min-width:110px}
+.hero .pills b{display:block;font-size:22px;line-height:1.2}.hero .pills span{font-size:12px;opacity:.85}
+.hero .hb{height:10px;background:rgba(255,255,255,.22);border-radius:6px;overflow:hidden;margin-top:14px}.hero .hb i{display:block;height:100%;background:#fff;border-radius:6px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.tile{background:var(--c);border:1px solid var(--l);border-top:4px solid var(--k);border-radius:14px;padding:14px;position:relative}
+.tile .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:22px;background:color-mix(in srgb,var(--k) 18%,transparent);margin-bottom:8px}
+.tile b{display:block;font-size:30px;line-height:1.1;color:var(--k)}
+.tile .nm{font-size:13px;margin:4px 0 8px;min-height:34px}
+.tile .pc{font-size:12px;color:var(--m);display:flex;justify-content:space-between;margin-bottom:4px}
+.tile .tb{height:7px;background:var(--l);border-radius:4px;overflow:hidden}.tile .tb i{display:block;height:100%;background:var(--k);border-radius:4px}
+.dmb{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--l)}.dmb i{display:block;height:100%}
+.dml{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-top:6px}.dml i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.sy small{width:auto;min-width:64px;white-space:nowrap}
+@media (max-width:560px){.hero{grid-template-columns:1fr;justify-items:center;text-align:center;padding:18px}.hero .pills{justify-content:center}}
+
 .lt{font-size:12px}.lt th,.lt td{padding:5px 6px;border:1px solid #d1d5db}.lt th{background:#f1f5f9}.lt td.n{text-align:right}
 .lt3{margin:18px 0 8px;font-size:15px;border-bottom:2px solid var(--b);padding-bottom:3px;color:#0a2463}
 @media print{
@@ -402,19 +422,6 @@ header .th{padding:6px 10px;font-size:15px;line-height:1}
 [data-theme="dark"] .logo{border-color:#162033}
 [data-theme="dark"] .lg{background:linear-gradient(135deg,#050b1f 0%,#13306f 55%,#0b6b73 100%)}
 }
-
-/* ===== Dashboard infografis ===== */
-.kpis .hero{display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding:6px 4px 14px}
-.ring{position:relative;width:150px;height:150px;flex:0 0 auto}.ring svg{width:100%;height:100%}
-.rg0,.rg1{fill:none;stroke-width:12}.rg0{stroke:var(--l)}.rg1{stroke:#16a34a;stroke-linecap:round}
-.rt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}.rt b{font-size:26px}.rt span{font-size:11px;color:var(--m)}
-.hn{flex:1;min-width:240px;display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
-.hn>div{background:var(--bg);border:1px solid var(--l);border-radius:12px;padding:12px}.hn span{font-size:12px;color:var(--m);display:block}.hn b{font-size:30px;line-height:1.2;display:block}
-.sts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
-.k2{position:relative;background:var(--bg);border:1px solid var(--l);border-top:4px solid var(--c);border-radius:12px;padding:12px}
-.k2 i{font-style:normal;font-size:22px;position:absolute;right:10px;top:8px;opacity:.9}.k2 b{font-size:28px;display:block;color:var(--c)}
-.k2 span{font-size:12px;display:block;min-height:32px;font-weight:600}.k2 em{font-style:normal;font-size:11px;color:var(--m)}
-.mb{height:7px;background:var(--l);border-radius:4px;overflow:hidden;margin:6px 0 4px}.mb div{height:100%;background:var(--c);border-radius:4px}
 </style>
 </head>
 <body>
@@ -460,18 +467,20 @@ header .th{padding:6px 10px;font-size:15px;line-height:1}
     <header><b>Pendataan Lulusan — <span id="sk"></span></b><span><button id="thH" class="th" onclick="toggleTheme()" aria-label="Ganti mode gelap atau terang">🌙</button> <button onclick="tab(5)">Ganti Password</button> <button onclick="doLogout()">Keluar</button></span></header>
     <main>
         <div class="tabs" id="tabs">
-            <button id="t1" class="on" onclick="tab(1)">📊 Dashboard</button>
-            <button id="t2" onclick="tab(2)">✏️ Isi Status Alumni</button>
-            <button id="t3" class="hide" onclick="tab(3)">📥 Impor Excel</button>
-            <button id="t7" onclick="tab(7)">📄 Laporan</button>
-            <button id="t6" class="hide" onclick="tab(6)">👤 Kelola Operator</button>
+            <button id="t1" class="on" onclick="tab(1)">Dashboard</button>
+            <button id="t2" onclick="tab(2)">Isi Status Alumni</button>
+            <button id="t3" class="hide" onclick="tab(3)">Impor Excel</button>
+            <button id="t7" onclick="tab(7)">Laporan</button>
+            <button id="t6" class="hide" onclick="tab(6)">Kelola Operator</button>
         </div>
 
         <section id="v1">
             <div class="card"><div class="row"><div><label>Tahun lulus</label><select id="fy" onchange="renderDash()"></select></div></div>
-                <div class="kpis" id="stat"></div></div>
+                </div>
+            <div id="stat"></div>
             <div class="card"><b>Grafik status alumni</b> <small>(dari alumni yang sudah mengisi; lingkaran mengikuti filter tahun di atas)</small>
-                <div class="cols" style="margin-top:12px"><div id="chDonut"></div><div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Komposisi status per tahun lulus</div><div id="chYear"></div></div></div></div>
+                <div class="cols" style="margin-top:12px"><div id="chDonut"></div><div><div style="font-weight:600;font-size:13px;margin-bottom:6px">Komposisi status per tahun lulus</div><div id="chYear"></div></div></div>
+                <div style="margin-top:18px"><div style="font-weight:600;font-size:13px;margin-bottom:8px">Domisili alumni yang sudah mengisi</div><div id="chDom"></div></div></div>
             <div class="card sc">
                 <div class="row"><b style="flex:2;min-width:200px">Rekap Jumlah Lulusan per Tahun</b>
                     <div id="wRs" class="hide"><label>Sekolah</label><select id="rs" onchange="renderRekap()"></select></div></div>
@@ -480,7 +489,6 @@ header .th{padding:6px 10px;font-size:15px;line-height:1}
                 <table id="rj"></table>
                 <small id="rkNote"></small>
             </div>
-            <div class="card"><b>Persentase per status</b> <small>(dari alumni yang sudah diisi)</small><div id="bars" style="margin-top:10px"></div></div>
             <div class="card sc"><b>Rekap per tahun lulus</b><table id="rekap"></table></div>
             <div class="card sc hide" id="cSek"><b>Progres pengisian per sekolah</b><table id="rekapSek"></table></div>
         </section>
@@ -705,16 +713,19 @@ async function load(){
 function tab(n){if(n===6)loadOps();if(n===7)renderLaporan();[1,2,3,4,5,6,7].forEach(i=>{const v=$('v'+i),b=$('t'+i);if(v)v.classList.toggle('hide',i!==n);if(b)b.classList.toggle('on',i===n)})}
 function home(){tab(U&&U.role==='alumni'?4:1)}
 const done=d=>ST.indexOf(d.Status)>=0;
+const pf=p=>{p=Number(p)||0;if(p<=0)return '0%';if(p<0.01)return '<0,01%';if(p<1)return p.toFixed(2).replace('.',',')+'%';if(p<10)return p.toFixed(1).replace('.',',')+'%';return Math.round(p)+'%'};
+const nf=x=>Number(x).toLocaleString('id-ID');
+const bw=p=>p>0?Math.max(Math.min(p,100),1.5):0;
+const IC=['🎓','💼','🏪','📜','⏳'];
 function cnt(rows){const c={};ST.forEach(s=>c[s]=0);rows.forEach(r=>{if(c[r.Status]!=null)c[r.Status]++});return c}
 
-const pct=(a,b)=>{if(!b)return '0';const p=a*100/b;return (p>0&&p<1?p.toFixed(2):p<10?p.toFixed(1):p.toFixed(0)).replace('.',',')};
-const SCOL=['#2563eb','#16a34a','#f59e0b','#8b5cf6','#ef4444'],SICO=['🎓','💼','🏪','📚','🔍'];
 function renderDash(){
     const y=$('fy').value,rows=y?D.filter(d=>String(d.TahunLulus)===y):D,c=cnt(rows),n=rows.length,f=rows.filter(done).length;
-    const pc=n?Math.min(f*100/n,100):0,RR=52,CC=2*Math.PI*RR;
-    $('stat').innerHTML=`<div class="hero"><div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="${RR}" class="rg0"/><circle cx="60" cy="60" r="${RR}" class="rg1" stroke-dasharray="${CC*pc/100} ${CC}" transform="rotate(-90 60 60)"/></svg><div class="rt"><b>${pct(f,n)}%</b><span>sudah diisi</span></div></div><div class="hn"><div><span>👥 Total alumni</span><b>${n}</b></div><div><span>✅ Sudah diisi</span><b class="ok">${f}</b></div><div><span>⏳ Belum diisi</span><b class="warn">${n-f}</b></div></div></div><div class="sts">`+ST.map((st,k)=>`<div class="k2" style="--c:${SCOL[k]}"><i>${SICO[k]}</i><b>${c[st]}</b><span>${esc(st)}</span><div class="mb"><div style="width:${f?c[st]*100/f:0}%"></div></div><em>${pct(c[st],f)}% dari yang terisi</em></div>`).join('')+'</div>';
-    $('bars').innerHTML=ST.map(s=>{const p=f?(c[s]*100/f):0;let x='';
-        return `<div>${s} — ${c[s]} (${p.toFixed(1)}%)<div class="bar" style="margin-bottom:${x?2:10}px"><i style="width:${p}%"></i></div>${x?'<div style="margin-bottom:10px">'+x+'</div>':''}</div>`}).join('');
+    const pr=n?f*100/n:0,KC=['#2563eb','#16a34a','#f59e0b','#8b5cf6','#ef4444'],R0=70,CC=2*Math.PI*R0,v=f?Math.max(Math.min(pr,100)/100,0.012):0,ptx=pf(pr);
+    const ring=`<svg viewBox="0 0 180 180" width="190" height="190" role="img" aria-label="Progres pengisian ${ptx}"><circle cx="90" cy="90" r="${R0}" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="16"/><circle cx="90" cy="90" r="${R0}" fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round" stroke-dasharray="${CC*v} ${CC}" transform="rotate(-90 90 90)"/><text x="90" y="92" text-anchor="middle" font-size="${ptx.length>5?30:36}" font-weight="800" fill="#fff">${ptx}</text><text x="90" y="114" text-anchor="middle" font-size="13" fill="#fff" fill-opacity=".85">sudah mengisi</text></svg>`;
+    const hero=`<div class="hero"><div>${ring}</div><div><h3>Progres pengisian status alumni${y?' — lulusan '+esc(y):''}</h3><p><b>${nf(f)}</b> dari <b>${nf(n)}</b> alumni sudah mengisi status.</p><div class="pills"><div><b>${nf(n)}</b><span>Total alumni</span></div><div><b>${nf(f)}</b><span>Sudah diisi</span></div><div><b>${nf(n-f)}</b><span>Belum diisi</span></div></div><div class="hb"><i style="width:${bw(pr)}%"></i></div></div></div>`;
+    const tiles=`<div class="tiles">`+ST.map((s,i)=>{const p=f?c[s]*100/f:0;return `<div class="tile" style="--k:${KC[i]}"><div class="ic">${IC[i]}</div><b>${nf(c[s])}</b><div class="nm">${esc(s)}</div><div class="pc"><span>dari yang mengisi</span><span>${pf(p)}</span></div><div class="tb"><i style="width:${bw(p)}%"></i></div></div>`}).join('')+`</div>`;
+    $('stat').innerHTML=hero+tiles;
     const yrs=[...new Set(D.map(d=>d.TahunLulus))].sort((a,b)=>b-a);
     $('rekap').innerHTML='<tr><th>Tahun</th>'+ST.map(s=>`<th>${s}</th>`).join('')+'<th>Belum</th><th>Total</th></tr>'+
         yrs.map(yy=>{const r=D.filter(d=>d.TahunLulus===yy),k=cnt(r);return `<tr><td>${esc(yy)}</td>${ST.map(s=>`<td>${k[s]}</td>`).join('')}<td>${r.filter(d=>!done(d)).length}</td><td><b>${r.length}</b></td></tr>`}).join('');
@@ -722,7 +733,7 @@ function renderDash(){
     if(U.role==='admin'){
         const sks=[...new Set(D.map(d=>d.Sekolah))].sort();
         $('rekapSek').innerHTML='<tr><th>Sekolah</th><th>Total</th><th>Terisi</th><th>Progres</th></tr>'+sks.map(s=>{const r=D.filter(d=>d.Sekolah===s),t=r.filter(done).length,p=r.length?t*100/r.length:0;
-            return `<tr><td>${esc(s)}</td><td>${r.length}</td><td>${t}</td><td style="min-width:140px">${pct(t,r.length)}%<div class="bar" style="margin:2px 0 0"><i style="width:${p}%"></i></div></td></tr>`}).join('');
+            return `<tr><td>${esc(s)}</td><td>${r.length}</td><td>${t}</td><td style="min-width:140px">${pf(p)}<div class="bar" style="margin:2px 0 0"><i style="width:${bw(p)}%"></i></div></td></tr>`}).join('');
     }
 }
 
@@ -742,10 +753,10 @@ function renderRekap(){
     yrs.forEach(y=>{const r=rows.filter(x=>Number(x.Tahun)===y),L=r.reduce((a,x)=>a+nv(x.L),0),P=r.reduce((a,x)=>a+nv(x.P),0),J=r.reduce((a,x)=>a+jml(x),0);
         const a=al.filter(d=>Number(d.TahunLulus)===y),f=a.filter(done).length,pc=J?Math.min(100,f*100/J):0;
         tL+=L;tP+=P;tJ+=J;tT+=a.length;tF+=f;
-        html+=`<tr><td>${y}</td><td>${L}</td><td>${P}</td><td><b>${J}</b></td><td>${a.length}</td><td>${f}</td><td style="min-width:120px">${pc.toFixed(0)}%<div class="bar" style="margin:2px 0 0"><i style="width:${pc}%"></i></div></td></tr>`});
+        html+=`<tr><td>${y}</td><td>${L}</td><td>${P}</td><td><b>${J}</b></td><td>${a.length}</td><td>${f}</td><td style="min-width:120px">${pf(pc)}<div class="bar" style="margin:2px 0 0"><i style="width:${bw(pc)}%"></i></div></td></tr>`});
     const tp=tJ?Math.min(100,tF*100/tJ):0;
     $('rk').innerHTML='<tr><th>Tahun lulus</th><th>L</th><th>P</th><th>Jumlah lulusan</th><th>Terdata di aplikasi</th><th>Status terisi</th><th>Progres</th></tr>'+html+
-        `<tr><td><b>Total</b></td><td><b>${tL}</b></td><td><b>${tP}</b></td><td><b>${tJ}</b></td><td><b>${tT}</b></td><td><b>${tF}</b></td><td><b>${tp.toFixed(0)}%</b></td></tr>`;
+        `<tr><td><b>Total</b></td><td><b>${tL}</b></td><td><b>${tP}</b></td><td><b>${tJ}</b></td><td><b>${tT}</b></td><td><b>${tF}</b></td><td><b>${pf(tp)}</b></td></tr>`;
     const byS=adm&&!pick,key=r=>byS?r.Sekolah:(r.Jurusan||'-'),keys=[...new Set(rows.map(key))].sort();
     $('rjT').textContent=byS?'Jumlah lulusan per sekolah':'Rincian per jurusan';
     $('rj').innerHTML=`<tr><th>${byS?'Sekolah':'Jurusan'}</th>${yrs.map(y=>`<th>${y}</th>`).join('')}<th>Total</th></tr>`+keys.map(k=>{
@@ -882,17 +893,22 @@ const COL=['#2563eb','#16a34a','#f59e0b','#8b5cf6','#ef4444','#64748b'];
 function donut(c,f){
     const r=62,C=2*Math.PI*r;let off=0;
     const arcs=f?ST.map((s,i)=>{const len=C*c[s]/f,a=`<circle cx="80" cy="80" r="${r}" fill="none" stroke="${COL[i]}" stroke-width="26" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 80 80)"><title>${esc(s)}: ${c[s]}</title></circle>`;off+=len;return a}).join(''):'<circle cx="80" cy="80" r="62" fill="none" style="stroke:var(--l)" stroke-width="26"/>';
-    const leg=ST.map((s,i)=>`<div class="lg2"><i style="background:${COL[i]}"></i><span>${esc(s)}</span><b>${c[s]}</b><small>${f?(c[s]*100/f).toFixed(1):'0.0'}%</small></div>`).join('');
+    const leg=ST.map((s,i)=>`<div class="lg2"><i style="background:${COL[i]}"></i><span>${esc(s)}</span><b>${c[s]}</b><small>${f?pf(c[s]*100/f):'0%'}</small></div>`).join('');
     return `<div class="dn"><svg viewBox="0 0 160 160" width="170" height="170"><g>${arcs}</g><text x="80" y="78" text-anchor="middle" font-size="26" font-weight="700" style="fill:var(--t)">${f}</text><text x="80" y="97" text-anchor="middle" font-size="11" style="fill:var(--m)">sudah mengisi</text></svg><div class="leg">${leg}</div></div>`;
 }
 function stackYear(rows){
     const yrs=[...new Set(rows.map(d=>Number(d.TahunLulus)))].sort((a,b)=>a-b);
     return yrs.map(y=>{const r=rows.filter(d=>Number(d.TahunLulus)===y),c=cnt(r),f=r.filter(done).length;
-        return `<div class="sy"><span>${y}</span><div class="sb">${f?ST.map((s,i)=>c[s]?`<i style="width:${c[s]*100/f}%;background:${COL[i]}" title="${esc(s)}: ${c[s]}"></i>`:'').join(''):'<em>belum ada yang mengisi</em>'}</div><small>${f}/${r.length}</small></div>`}).join('')||'<small>Belum ada data.</small>';
+        return `<div class="sy"><span>${y}</span><div class="sb">${f?ST.map((s,i)=>c[s]?`<i style="width:${c[s]*100/f}%;background:${COL[i]}" title="${esc(s)}: ${c[s]}"></i>`:'').join(''):'<em>belum ada yang mengisi</em>'}</div><small>${nf(f)}/${nf(r.length)} · ${pf(r.length?f*100/r.length:0)}</small></div>`}).join('')||'<small>Belum ada data.</small>';
+}
+function domBar(rows){
+    const a=rows.filter(d=>d.Domisili==='Dalam DIY').length,b=rows.filter(d=>d.Domisili==='Luar DIY').length,t=a+b;
+    if(!t)return '<small>Belum ada data domisili.</small>';
+    return `<div class="dmb"><i style="width:${a*100/t}%;background:#0e9fa8" title="Dalam DIY: ${a}"></i><i style="width:${b*100/t}%;background:#f97316" title="Luar DIY: ${b}"></i></div><div class="dml"><span><i style="background:#0e9fa8"></i>Dalam DIY <b>${nf(a)}</b> (${pf(a*100/t)})</span><span><i style="background:#f97316"></i>Luar DIY <b>${nf(b)}</b> (${pf(b*100/t)})</span></div>`;
 }
 function renderCharts(){
     const y=$('fy').value,rows=y?D.filter(d=>String(d.TahunLulus)===y):D;
-    $('chDonut').innerHTML=donut(cnt(rows),rows.filter(done).length);$('chYear').innerHTML=stackYear(D);
+    $('chDonut').innerHTML=donut(cnt(rows),rows.filter(done).length);$('chYear').innerHTML=stackYear(D);$('chDom').innerHTML=domBar(rows.filter(done));
 }
 
 // ---- Laporan ----
@@ -924,7 +940,7 @@ function lapModel(){
 }
 function renderLaporan(){
     if(!U||U.role==='alumni')return;
-    const m=lapModel(),n=x=>Number(x).toLocaleString('id-ID'),pct=(a,b)=>b?(a*100/b).toFixed(1)+'%':'-',base=m.lul||m.al.length;
+    const m=lapModel(),n=x=>Number(x).toLocaleString('id-ID'),pct=(a,b)=>b?pf(a*100/b):'-',base=m.lul||m.al.length;
     const th=ST.map(s=>`<th>${esc(s)}</th>`).join('');
     let h=`<div><div style="font-size:12px;letter-spacing:.08em;color:var(--m)">LAPORAN</div><h2 style="margin:2px 0 0;font-size:20px;color:var(--t)">Pendataan Lulusan Jenjang SMA/SMK Kab. Gunungkidul</h2><div style="font-weight:600;margin-top:4px">${esc(m.scope)}</div><div style="font-size:13px;color:var(--m)">${m.per} · Dicetak ${m.tgl} oleh ${esc(U.username)}</div></div>`;
     h+=`<div class="stat" style="margin:14px 0"><div><b>${m.hasRekap?n(m.lul):'-'}</b><span>Jumlah lulusan (rekap dinas)</span></div><div><b>${n(m.al.length)}</b><span>Terdata di aplikasi</span></div><div><b class="ok">${n(m.f)}</b><span>Sudah mengisi (${pct(m.f,base)} dari ${m.lul?'lulusan':'terdata'})</span></div><div><b class="warn">${n(m.al.length-m.f)}</b><span>Belum mengisi</span></div></div>`;
