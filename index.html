@@ -71,10 +71,13 @@
   var FN = {
     login: async function (username, password) {
       await siap;
-      var uname = clean(username).toLowerCase();
-      if (/^\d+$/.test(uname)) uname = nisn(uname);
-      try { await F.signInWithEmailAndPassword(F.auth, uname + DOMAIN, String(password == null ? '' : password)); }
-      catch (e) { throw new Error(/too-many/.test(e.code) ? 'Terlalu banyak percobaan gagal. Coba lagi beberapa menit lagi.' : 'Username atau password salah.'); }
+      var uname = clean(username).toLowerCase(), pw = String(password == null ? '' : password), kandidat = [uname], berhasil = false, kode = '';
+      if (/^\d+$/.test(uname) && nisn(uname) !== uname) kandidat.push(nisn(uname));   // NISN yang nolnya hilang; NPSN (8 digit) dicoba apa adanya dulu
+      for (var i = 0; i < kandidat.length && !berhasil; i++) {
+        try { await F.signInWithEmailAndPassword(F.auth, kandidat[i] + DOMAIN, pw); berhasil = true; }
+        catch (e) { kode = e.code || ''; if (/too-many/.test(kode)) break; }
+      }
+      if (!berhasil) throw new Error(/too-many/.test(kode) ? 'Terlalu banyak percobaan gagal. Coba lagi beberapa menit lagi.' : 'Username atau password salah.');
       PROF = null; var p = await profil(), user, data = null;
       if (p.role === 'alumni') {
         var a = await F.getDoc(D('alumni', p.alumniId));
