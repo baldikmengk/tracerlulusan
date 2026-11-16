@@ -93,10 +93,20 @@
         if (!a.exists()) throw new Error('Data alumni tidak ditemukan. Hubungi admin dinas.');
         user = { username: p.nisn, sekolah: a.data().Sekolah, npsn: a.data().NPSN || '', role: 'alumni', id: a.id, row: 0, nama: a.data().Nama, defaultPw: p.defaultPw !== false };
         data = [obj(a)];
-      } else user = { username: p.username, sekolah: p.sekolah, role: p.role, npsn: p.npsn || '' };
+      } else { user = { username: p.username, sekolah: p.sekolah, role: p.role, npsn: p.npsn || '' }; FN.ping().catch(function () {}); }
       return { token: p.uid, user: user, data: data };
     },
-    logout: async function () { await siap; PROF = null; await F.signOut(F.auth); },
+    logout: async function () {
+      await siap;
+      try { var u = F.auth.currentUser; if (u && PROF && PROF.role !== 'alumni') await F.setDoc(D('presence', u.uid), { username: PROF.username, online: false, lastSeen: F.serverTimestamp() }); } catch (e) {}
+      PROF = null; await F.signOut(F.auth);
+    },
+    // Penanda online: dipanggil saat login dan berkala (tiap 60 detik) selama operator/admin membuka aplikasi
+    ping: async function () {
+      var p = await profil(); if (p.role === 'alumni') return false;
+      await F.setDoc(D('presence', p.uid), { username: p.username, online: true, lastSeen: F.serverTimestamp() });
+      return true;
+    },
 
     getAlumni: async function () {
       var p = await profil();
@@ -158,8 +168,13 @@
 
     listOperator: async function () {
       var p = await profil(); wajibAdmin(p);
+      var pres = {};
+      try { (await F.getDocs(C('presence'))).forEach(function (d) { pres[d.id] = d.data(); }); } catch (e) {}   // gagal baca (aturan belum dipasang) -> semua tampil Offline
+      var kini = Date.now(), BATAS = 3 * 60000;   // dianggap online bila terakhir aktif < 3 menit
       return (await F.getDocs(F.query(C('users'), F.where('role', 'in', ['admin', 'operator'])))).docs.map(function (d) {
-        var x = d.data(); return { Username: x.username, Sekolah: x.sekolah, Role: x.role, Aktif: x.aktif !== false, NPSN: x.npsn || '' };
+        var x = d.data(), pr = pres[d.id], ls = (pr && pr.lastSeen && pr.lastSeen.toMillis) ? pr.lastSeen.toMillis() : 0;
+        return { Username: x.username, Sekolah: x.sekolah, Role: x.role, Aktif: x.aktif !== false, NPSN: x.npsn || '',
+                 Online: !!(pr && pr.online !== false && ls && kini - ls < BATAS && x.aktif !== false), TerakhirAktif: ls };
       });
     },
     opSetAktif: async function (t, username, aktif) {
@@ -573,7 +588,7 @@ header .th{padding:6px 10px;font-size:15px;line-height:1}
                 <div id="oM" style="font-size:13px"></div>
             </div>
             <div class="card">
-                <div class="row"><b style="flex:2;min-width:160px">Daftar operator</b><div><input id="oQ" placeholder="Cari username / sekolah" oninput="renderOps()"></div></div>
+                <div class="row"><b style="flex:2;min-width:160px">Daftar operator</b><div><input id="oQ" placeholder="Cari username / sekolah" oninput="renderOps()"></div><button class="g" onclick="loadOps()">Segarkan</button></div>
                 <div id="oMsg" style="font-size:13px;margin-bottom:8px"></div>
                 <div class="sc"><table id="ot" class="rt"></table></div>
             </div>
@@ -677,7 +692,7 @@ async function doLogin(){
     catch(e){$('msg').textContent=e.message||'Login gagal, coba lagi.'}
     bl.disabled=false;bl.textContent='Masuk';
 }
-function doLogout(){Object.keys(PCH).forEach(k=>delete PCH[k]);
+function doLogout(){stopHeartbeat();Object.keys(PCH).forEach(k=>delete PCH[k]);
     PRE=null;PRER=null;busy('');
     if(T)call('logout',T).catch(()=>{});
     T='';U=null;D=[];R=[];ls.del('ts_t');ls.del('ts_u');
@@ -691,6 +706,7 @@ async function start(){
     $('sk').textContent=U.sekolah;$('t3').classList.toggle('hide',!adm);$('cSek').classList.toggle('hide',!adm);$('wRs').classList.toggle('hide',!adm);
     $('tabs').classList.toggle('hide',alm);$('t6').classList.toggle('hide',!adm);$('wLs').classList.toggle('hide',!adm);$('wSk').classList.toggle('hide',!adm);
     await load();
+    startHeartbeat();
     if(alm){fillSaya();tab(4)}else tab(1);
 }
 async function load(){
@@ -862,11 +878,20 @@ async function resetPw(id){
     try{await call('resetSandi',T,id);alert('Password dikembalikan ke NISN.')}catch(e){alert(e.message)}
 }
 let OPS=[];
+function lalu(ms){if(!ms)return 'belum pernah';const d=Math.max(0,Math.round((Date.now()-ms)/60000));if(d<1)return 'baru saja';if(d<60)return d+' menit lalu';const j=Math.round(d/60);if(j<24)return j+' jam lalu';return Math.round(j/24)+' hari lalu'}
+function onlineLabel(o){return o.Online?'<span class="ok" style="font-weight:600">● Online</span>':'<span style="color:var(--m)">○ Offline</span><br><small>'+lalu(o.TerakhirAktif)+'</small>'}
+// Penanda online + penyegaran otomatis daftar operator
+let HB=null,HB2=null;
+function pingOnline(){if(U&&U.role!=='alumni')once('ping',[]).catch(()=>{})}
+function startHeartbeat(){stopHeartbeat();if(!U||U.role==='alumni')return;pingOnline();HB=setInterval(pingOnline,60000);
+    HB2=setInterval(()=>{if(U&&U.role==='admin'&&!$('v6').classList.contains('hide')&&!document.hidden)once('listOperator',[T]).then(r=>{OPS=r;renderOps()}).catch(()=>{})},30000)}
+function stopHeartbeat(){clearInterval(HB);clearInterval(HB2);HB=HB2=null}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)pingOnline()});
 async function loadOps(){try{OPS=await call('listOperator',T);renderOps()}catch(e){$('oMsg').className='warn';$('oMsg').textContent=e.message}}
 function renderOps(){
     const q=$('oQ').value.toLowerCase(),r=OPS.filter(o=>!q||(o.Username+' '+o.Sekolah).toLowerCase().includes(q));
-    $('ot').innerHTML='<tr><th>Username</th><th>Sekolah</th><th>NPSN</th><th>Peran</th><th>Status</th><th></th></tr>'+(r.map(o=>`<tr><td data-l="Username" class="nm">${esc(o.Username)}</td><td data-l="Sekolah">${esc(o.Sekolah)}</td><td data-l="NPSN">${o.NPSN?esc(o.NPSN):'<small>kosong</small>'}</td><td data-l="Peran">${esc(o.Role)}</td><td data-l="Status">${o.Aktif?'<span class="ok">Aktif</span>':'<span class="err">Nonaktif</span>'}</td>
-        <td class="act" data-l="" style="white-space:nowrap"><button class="g" data-u="${esc(o.Username)}" onclick="opReset(this.dataset.u)">Reset Sandi</button> <button class="${o.Aktif?'r':''}" data-u="${esc(o.Username)}" onclick="opToggle(this.dataset.u,${!o.Aktif})">${o.Aktif?'Nonaktifkan':'Aktifkan'}</button></td></tr>`).join('')||'<tr><td colspan="6">Belum ada akun.</td></tr>');
+    $('ot').innerHTML='<tr><th>Username</th><th>Sekolah</th><th>NPSN</th><th>Peran</th><th>Status</th><th>Online</th><th></th></tr>'+(r.map(o=>`<tr><td data-l="Username" class="nm">${esc(o.Username)}</td><td data-l="Sekolah">${esc(o.Sekolah)}</td><td data-l="NPSN">${o.NPSN?esc(o.NPSN):'<small>kosong</small>'}</td><td data-l="Peran">${esc(o.Role)}</td><td data-l="Status">${o.Aktif?'<span class="ok">Aktif</span>':'<span class="err">Nonaktif</span>'}</td><td data-l="Online">${onlineLabel(o)}</td>
+        <td class="act" data-l="" style="white-space:nowrap"><button class="g" data-u="${esc(o.Username)}" onclick="opReset(this.dataset.u)">Reset Sandi</button> <button class="${o.Aktif?'r':''}" data-u="${esc(o.Username)}" onclick="opToggle(this.dataset.u,${!o.Aktif})">${o.Aktif?'Nonaktifkan':'Aktifkan'}</button></td></tr>`).join('')||'<tr><td colspan="7">Belum ada akun.</td></tr>');
 }
 async function opAdd(){
     const m=$('oM');m.className='';m.textContent='Menyimpan...';
