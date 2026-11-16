@@ -49,7 +49,11 @@
   async function cGet(k) { try { var d = await idb(); return await new Promise(function (ok) { var q = d.transaction('c').objectStore('c').get(k); q.onsuccess = function () { ok(q.result || null); }; q.onerror = function () { ok(null); }; }); } catch (e) { return null; } }
   async function cSet(k, v) { try { var d = await idb(); d.transaction('c', 'readwrite').objectStore('c').put(v, k); } catch (e) {} }
   async function cBuang() { try { var d = await idb(); await new Promise(function (ok) { var t = d.transaction('c', 'readwrite'); t.objectStore('c').clear(); t.oncomplete = ok; t.onerror = ok; }); } catch (e) {} }
-  var TULIS = { login: 1, logout: 1, updateStatus: 1, updateStatusBatch: 1, deleteAlumni: 1, simpanSaya: 1, importAlumni: 1, importStatus: 1 };
+  // Fungsi yang menghapus cache browser setelah dijalankan. Untuk ADMIN, cache tidak dihapus oleh simpan/impor status/keluar karena
+  // perubahan diambil lewat sinkron bertahap (lihat getAlumni); hapus data memperbarui cache langsung; impor alumni baru menghapus cache.
+  var TULIS = { logout: 1, updateStatus: 1, updateStatusBatch: 1, deleteAlumni: 1, simpanSaya: 1, importAlumni: 1, importStatus: 1 };
+  var ADMIN_LEWAT = { logout: 1, updateStatus: 1, updateStatusBatch: 1, deleteAlumni: 1, importStatus: 1 };
+  var SINKRON_PENUH_HARI = 7, MUNDUR_MENIT = 15;
   var obj = function (d) { return Object.assign({}, d.data(), { ID: d.id, _r: 0 }); };
 
   async function profil() {
@@ -101,7 +105,7 @@
       try { var u = F.auth.currentUser; if (u && PROF && PROF.role !== 'alumni') await F.setDoc(D('presence', u.uid), { username: PROF.username, online: false, lastSeen: F.serverTimestamp() }); } catch (e) {}
       PROF = null; await F.signOut(F.auth);
     },
-    // Penanda online: dipanggil saat login dan berkala (tiap 60 detik) selama operator/admin membuka aplikasi
+    // Penanda online: dipanggil saat login dan berkala (tiap 5 menit) selama operator/admin membuka aplikasi
     ping: async function () {
       var p = await profil(); if (p.role === 'alumni') return false;
       await F.setDoc(D('presence', p.uid), { username: p.username, online: true, lastSeen: F.serverTimestamp() });
@@ -112,6 +116,22 @@
       var p = await profil();
       if (p.role === 'alumni') { var a = await F.getDoc(D('alumni', p.alumniId)); return a.exists() ? [obj(a)] : []; }
       var kunci = 'alumni:' + p.uid, c = await cGet(kunci);
+      if (p.role === 'admin') {   // admin: baca penuh sekali, selanjutnya hanya dokumen yang berubah sejak sinkron terakhir
+        if (c && c.sk && Date.now() - c.sk < SINKRON_PENUH_HARI * 86400000) {
+          try {
+            var since = new Date(c.t - MUNDUR_MENIT * 60000).toISOString();
+            var snap = await F.getDocs(F.query(C('alumni'), F.where('Diperbarui', '>', since)));
+            var peta = {}; c.rows.forEach(function (r) { peta[r.ID] = r; });
+            snap.docs.forEach(function (d) { peta[d.id] = obj(d); });
+            var gabung = Object.keys(peta).map(function (k) { return peta[k]; });
+            cSet(kunci, { t: Date.now(), sk: c.sk, rows: gabung });
+            return gabung;
+          } catch (e) { /* gagal sinkron bertahap -> baca penuh di bawah */ }
+        }
+        var semua = (await muatAlumni(p)).map(obj);
+        cSet(kunci, { t: Date.now(), sk: Date.now(), rows: semua });
+        return semua;
+      }
       if (c && Date.now() - c.t < CACHE_MENIT * 60000) return c.rows;
       var rows = (await muatAlumni(p)).map(obj);
       cSet(kunci, { t: Date.now(), rows: rows });
@@ -147,7 +167,14 @@
       }
       return { ok: ok, gagal: gagal };
     },
-    deleteAlumni: async function (t, id) { var p = await profil(); wajibAdmin(p); await F.deleteDoc(D('alumni', id)); return true; },
+    deleteAlumni: async function (t, id) {
+      var p = await profil(); wajibAdmin(p); await F.deleteDoc(D('alumni', id));
+      var kunci = 'alumni:' + p.uid, c = await cGet(kunci);
+      if (c) { c.rows = c.rows.filter(function (r) { return r.ID !== id; }); await cSet(kunci, c); }
+      return true;
+    },
+    // Admin: paksa baca penuh pada pemuatan berikutnya (tombol "Muat ulang penuh")
+    hapusCache: async function () { var p = await profil(); wajibAdmin(p); await cBuang(); return true; },
     simpanSaya: async function (t, status, instansi, detail, kota, telepon, domisili) {
       var p = await profil(); if (p.role !== 'alumni') throw new Error('Fitur ini khusus alumni.');
       if (STATUS.indexOf(status) < 0) throw new Error('Pilih status terlebih dahulu.');
@@ -170,7 +197,7 @@
       var p = await profil(); wajibAdmin(p);
       var pres = {};
       try { (await F.getDocs(C('presence'))).forEach(function (d) { pres[d.id] = d.data(); }); } catch (e) {}   // gagal baca (aturan belum dipasang) -> semua tampil Offline
-      var kini = Date.now(), BATAS = 3 * 60000;   // dianggap online bila terakhir aktif < 3 menit
+      var kini = Date.now(), BATAS = 10 * 60000;   // dianggap online bila terakhir aktif < 10 menit
       return (await F.getDocs(F.query(C('users'), F.where('role', 'in', ['admin', 'operator'])))).docs.map(function (d) {
         var x = d.data(), pr = pres[d.id], ls = (pr && pr.lastSeen && pr.lastSeen.toMillis) ? pr.lastSeen.toMillis() : 0;
         return { Username: x.username, Sekolah: x.sekolah, Role: x.role, Aktif: x.aktif !== false, NPSN: x.npsn || '',
@@ -282,7 +309,8 @@
       if (typeof gagal === 'function') gagal(m, user); else console.error('[Firebase] ' + nama + ':', e);
     };
     if (!FN[nama]) return galat(new Error('Fungsi tidak tersedia: ' + nama));
-    Promise.resolve().then(function () { return FN[nama].apply(null, args); }).then(function (d) { return TULIS[nama] ? cBuang().then(function () { return d; }) : d; }).then(function (d) {
+    var adm = !!(PROF && PROF.role === 'admin');   // dicek sebelum fungsi jalan (logout mengosongkan PROF)
+    Promise.resolve().then(function () { return FN[nama].apply(null, args); }).then(function (d) { return (TULIS[nama] && !(adm && ADMIN_LEWAT[nama])) ? cBuang().then(function () { return d; }) : d; }).then(function (d) {
       if (typeof ok === 'function') setTimeout(function () { ok(d === undefined ? null : d, user); }, 0);
     }, galat);
   }
@@ -593,6 +621,11 @@ header .th{padding:6px 10px;font-size:15px;line-height:1}
                 <div class="sc"><table id="ot" class="rt"></table></div>
             </div>
             <div class="card">
+                <b>Data alumni di browser ini</b>
+                <p style="font-size:13px;margin:6px 0">Data alumni disimpan di browser ini dan hanya memuat perubahan terbaru saat Anda masuk (hemat kuota Firestore). Gunakan tombol ini hanya jika data terasa tidak sesuai, misalnya setelah ada data yang dihapus dari perangkat lain. Ini membaca ulang seluruh data.</p>
+                <button class="g" onclick="muatPenuh()">Muat ulang penuh</button>
+            </div>
+            <div class="card">
                 <b>Pencocokan sekolah dengan NPSN</b>
                 <p style="font-size:13px;margin:6px 0">Melengkapi NPSN yang masih kosong pada data siswa dan akun operator, berdasarkan nama sekolah yang cocok dengan file rekap atau akun operator ber-NPSN. Sekolah yang tidak ditemukan akan dilaporkan.</p>
                 <button onclick="doNpsn()">Lengkapi NPSN otomatis</button>
@@ -880,12 +913,11 @@ async function resetPw(id){
 let OPS=[];
 function lalu(ms){if(!ms)return 'belum pernah';const d=Math.max(0,Math.round((Date.now()-ms)/60000));if(d<1)return 'baru saja';if(d<60)return d+' menit lalu';const j=Math.round(d/60);if(j<24)return j+' jam lalu';return Math.round(j/24)+' hari lalu'}
 function onlineLabel(o){return o.Online?'<span class="ok" style="font-weight:600">● Online</span>':'<span style="color:var(--m)">○ Offline</span><br><small>'+lalu(o.TerakhirAktif)+'</small>'}
-// Penanda online + penyegaran otomatis daftar operator
-let HB=null,HB2=null;
+// Penanda online (daftar operator disegarkan manual lewat tombol Segarkan)
+let HB=null;
 function pingOnline(){if(U&&U.role!=='alumni')once('ping',[]).catch(()=>{})}
-function startHeartbeat(){stopHeartbeat();if(!U||U.role==='alumni')return;pingOnline();HB=setInterval(pingOnline,60000);
-    HB2=setInterval(()=>{if(U&&U.role==='admin'&&!$('v6').classList.contains('hide')&&!document.hidden)once('listOperator',[T]).then(r=>{OPS=r;renderOps()}).catch(()=>{})},30000)}
-function stopHeartbeat(){clearInterval(HB);clearInterval(HB2);HB=HB2=null}
+function startHeartbeat(){stopHeartbeat();if(!U||U.role==='alumni')return;pingOnline();HB=setInterval(pingOnline,300000)}
+function stopHeartbeat(){clearInterval(HB);HB=null}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)pingOnline()});
 async function loadOps(){try{OPS=await call('listOperator',T);renderOps()}catch(e){$('oMsg').className='warn';$('oMsg').textContent=e.message}}
 function renderOps(){
@@ -906,6 +938,10 @@ async function opReset(u){
 async function opToggle(u,aktif){
     if(!confirm((aktif?'Aktifkan':'Nonaktifkan')+' akun "'+u+'"?'+(aktif?'':' Operator tidak bisa login dan sesinya langsung berakhir.')))return;
     try{await call('opSetAktif',T,u,aktif);$('oMsg').textContent='';loadOps()}catch(e){$('oMsg').className='err';$('oMsg').textContent=e.message}
+}
+async function muatPenuh(){
+    if(!confirm('Baca ulang seluruh data alumni dari server? Ini memakai kuota baca Firestore sebanyak jumlah data alumni.'))return;
+    try{await call('hapusCache',T);await load();alert('Data alumni dimuat ulang.')}catch(e){alert(e.message)}
 }
 async function doNpsn(){
     const m=$('nM');m.className='';m.textContent='Memproses...';
