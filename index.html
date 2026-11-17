@@ -17,9 +17,9 @@
   var DOMAIN = '@gk.local', BASE = 'https://www.gstatic.com/firebasejs/10.14.1/';
   if (window.google && google.script && google.script.run) return;
 
-  var STATUS = ['Melanjutkan Pendidikan', 'Bekerja', 'Berwirausaha', 'Mengikuti Pendidikan Nonformal/Pelatihan', 'Belum Bekerja'];
+  var STATUS = ['Melanjutkan Pendidikan', 'Bekerja', 'Berwirausaha', 'Mengikuti Pendidikan Nonformal/Pelatihan', 'Tidak Bekerja'];
   var DOM = ['Dalam DIY', 'Luar DIY'];
-  var ALIAS = { KULIAH: STATUS[0], MELANJUTKAN: STATUS[0], MELANJUTKANKULIAH: STATUS[0], WIRAUSAHA: STATUS[2], PELATIHAN: STATUS[3], NONFORMAL: STATUS[3], MENGANGGUR: STATUS[4], BELUMBEKERJA: STATUS[4] };
+  var ALIAS = { KULIAH: STATUS[0], MELANJUTKAN: STATUS[0], MELANJUTKANKULIAH: STATUS[0], WIRAUSAHA: STATUS[2], PELATIHAN: STATUS[3], NONFORMAL: STATUS[3], MENGANGGUR: STATUS[4], BELUMBEKERJA: STATUS[4], TIDAKBEKERJA: STATUS[4] };   // 'Belum Bekerja' (nama lama) otomatis menjadi 'Tidak Bekerja'
 
   var clean = function (v) { return String(v == null ? '' : v).replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g, '').replace(/\s+/g, ' ').trim(); };
   var norm = function (s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); };
@@ -44,7 +44,7 @@
   var C = function (n) { return F.collection(F.db, n); };
   var D = function (n, id) { return F.doc(F.db, n, String(id)); };
   // Cache data alumni di browser agar muat ulang halaman tidak membaca ulang ribuan dokumen (hemat kuota Firestore)
-  var CACHE_MENIT = 30;
+  var CACHE_MENIT = 720;   // operator: cache 12 jam (dibersihkan saat Keluar)
   function idb() { return new Promise(function (ok, no) { var r = indexedDB.open('lulusan-cache', 1); r.onupgradeneeded = function () { r.result.createObjectStore('c'); }; r.onsuccess = function () { ok(r.result); }; r.onerror = function () { no(r.error); }; }); }
   async function cGet(k) { try { var d = await idb(); return await new Promise(function (ok) { var q = d.transaction('c').objectStore('c').get(k); q.onsuccess = function () { ok(q.result || null); }; q.onerror = function () { ok(null); }; }); } catch (e) { return null; } }
   async function cSet(k, v) { try { var d = await idb(); d.transaction('c', 'readwrite').objectStore('c').put(v, k); } catch (e) {} }
@@ -53,7 +53,10 @@
   // perubahan diambil lewat sinkron bertahap (lihat getAlumni); hapus data memperbarui cache langsung; impor alumni baru menghapus cache.
   var TULIS = { logout: 1, updateStatus: 1, updateStatusBatch: 1, deleteAlumni: 1, simpanSaya: 1, importAlumni: 1, importStatus: 1 };
   var ADMIN_LEWAT = { logout: 1, updateStatus: 1, updateStatusBatch: 1, deleteAlumni: 1, importStatus: 1 };
+  var OP_LEWAT = { updateStatus: 1, updateStatusBatch: 1, importStatus: 1 };   // operator: cache diperbarui langsung, tidak dihapus
   var SINKRON_PENUH_HARI = 7, MUNDUR_MENIT = 15;
+  async function cUbah(uid, fn) { try { var k = 'alumni:' + uid, c = await cGet(k); if (c && c.rows) { fn(c.rows); await new Promise(function (ok) { idb().then(function (d) { var t = d.transaction('c', 'readwrite'); t.objectStore('c').put(c, k); t.oncomplete = ok; t.onerror = ok; }, ok); }); } } catch (e) {} }
+  var terapkan = function (rows, peta) { rows.forEach(function (r) { var f = peta[r.ID]; if (f) Object.assign(r, f); }); };
   var obj = function (d) { return Object.assign({}, d.data(), { ID: d.id, _r: 0 }); };
 
   async function profil() {
@@ -117,14 +120,14 @@
       if (p.role === 'alumni') { var a = await F.getDoc(D('alumni', p.alumniId)); return a.exists() ? [obj(a)] : []; }
       var kunci = 'alumni:' + p.uid, c = await cGet(kunci);
       if (p.role === 'admin') {   // admin: baca penuh sekali, selanjutnya hanya dokumen yang berubah sejak sinkron terakhir
-        if (c && c.sk && Date.now() - c.sk < SINKRON_PENUH_HARI * 86400000) {
+        if (c && (c.sk || c.t) && Date.now() - (c.sk || c.t) < SINKRON_PENUH_HARI * 86400000) {   // cache versi lama (hanya c.t) tetap dipakai sebagai dasar sinkron
           try {
             var since = new Date(c.t - MUNDUR_MENIT * 60000).toISOString();
             var snap = await F.getDocs(F.query(C('alumni'), F.where('Diperbarui', '>', since)));
             var peta = {}; c.rows.forEach(function (r) { peta[r.ID] = r; });
             snap.docs.forEach(function (d) { peta[d.id] = obj(d); });
             var gabung = Object.keys(peta).map(function (k) { return peta[k]; });
-            cSet(kunci, { t: Date.now(), sk: c.sk, rows: gabung });
+            cSet(kunci, { t: Date.now(), sk: c.sk || c.t, rows: gabung });
             return gabung;
           } catch (e) { /* gagal sinkron bertahap -> baca penuh di bawah */ }
         }
@@ -148,7 +151,9 @@
       if (STATUS.indexOf(status) < 0) throw new Error('Pilih status terlebih dahulu.');
       var upd = { Status: status, Instansi: clean(instansi), Detail: clean(detail), Diperbarui: sekarang(), Operator: p.username };
       if (domisili !== undefined) { domisili = clean(domisili); if (domisili && DOM.indexOf(domisili) < 0) throw new Error('Domisili hanya boleh Dalam DIY atau Luar DIY.'); upd.Domisili = domisili; }
-      await F.updateDoc(D('alumni', id), upd); return true;
+      await F.updateDoc(D('alumni', id), upd);
+      var pt = {}; pt[id] = upd; await cUbah(p.uid, function (rows) { terapkan(rows, pt); });
+      return true;
     },
     updateStatusBatch: async function (t, items) {
       var p = await profil(); bukanAlumni(p);
@@ -165,6 +170,8 @@
         try { await b.commit(); potong.forEach(function (v) { ok.push(v.id); }); }
         catch (e) { potong.forEach(function (v) { gagal.push({ id: v.id, alasan: e.code === 'permission-denied' ? 'Tidak punya akses.' : 'Gagal menyimpan.' }); }); }
       }
+      var pb = {}; valid.forEach(function (v) { if (ok.indexOf(v.id) >= 0) pb[v.id] = v.f; });
+      if (ok.length) await cUbah(p.uid, function (rows) { terapkan(rows, pb); });
       return { ok: ok, gagal: gagal };
     },
     deleteAlumni: async function (t, id) {
@@ -274,7 +281,11 @@
         ok++; upd.push({ ref: d.ref, f: { Status: st, Instansi: '', Detail: '', Diperbarui: sekarang(), Operator: p.username, Domisili: dom } });
       });
       if (!dry && belum) throw new Error('Impor dibatalkan: ' + belum + ' baris belum lengkap (Status/Domisili kosong). Lengkapi file lalu coba lagi.');
-      if (!dry && upd.length) await tulis(upd.map(function (u) { return function (b) { b.update(u.ref, u.f); }; }));
+      if (!dry && upd.length) {
+        await tulis(upd.map(function (u) { return function (b) { b.update(u.ref, u.f); }; }));
+        var pi = {}; upd.forEach(function (u) { pi[u.ref.id] = u.f; });
+        await cUbah(p.uid, function (rows) { terapkan(rows, pi); });
+      }
       return { tambah: ok, lewat: masalah.length, masalah: masalah, peringatan: peringatan, belumLengkap: belum };
     },
     importRekap: async function (t, rows, reset, dry) {
@@ -309,8 +320,9 @@
       if (typeof gagal === 'function') gagal(m, user); else console.error('[Firebase] ' + nama + ':', e);
     };
     if (!FN[nama]) return galat(new Error('Fungsi tidak tersedia: ' + nama));
-    var adm = !!(PROF && PROF.role === 'admin');   // dicek sebelum fungsi jalan (logout mengosongkan PROF)
-    Promise.resolve().then(function () { return FN[nama].apply(null, args); }).then(function (d) { return (TULIS[nama] && !(adm && ADMIN_LEWAT[nama])) ? cBuang().then(function () { return d; }) : d; }).then(function (d) {
+    var ubahLama = function (rows) { if (Array.isArray(rows)) rows.forEach(function (r) { if (r && r.Status === 'Belum Bekerja') r.Status = 'Tidak Bekerja'; }); };   // data/cache lama
+    var adm = !!(PROF && PROF.role === 'admin'), opr = !!(PROF && PROF.role === 'operator');   // dicek sebelum fungsi jalan (logout mengosongkan PROF)
+    Promise.resolve().then(function () { return FN[nama].apply(null, args); }).then(function (d) { if (nama === 'getAlumni') ubahLama(d); else if (nama === 'login' && d) ubahLama(d.data); return d; }).then(function (d) { return (TULIS[nama] && !(adm && ADMIN_LEWAT[nama]) && !(opr && OP_LEWAT[nama])) ? cBuang().then(function () { return d; }) : d; }).then(function (d) {
       if (typeof ok === 'function') setTimeout(function () { ok(d === undefined ? null : d, user); }, 0);
     }, galat);
   }
@@ -661,8 +673,8 @@ header .th{padding:6px 10px;font-size:15px;line-height:1}
 </div>
 
 <script>
-const ST=['Melanjutkan Pendidikan','Bekerja','Berwirausaha','Mengikuti Pendidikan Nonformal/Pelatihan','Belum Bekerja'];
-const BB='Belum Bekerja';
+const ST=['Melanjutkan Pendidikan','Bekerja','Berwirausaha','Mengikuti Pendidikan Nonformal/Pelatihan','Tidak Bekerja'];
+const BB='Tidak Bekerja';
 const DOM=['Dalam DIY','Luar DIY'];
 const domCell=v=>`<select class="dm"><option value="">— pilih —</option>${DOM.map(x=>`<option${x===v?' selected':''}>${x}</option>`).join('')}</select>`;
 let T='',U=null,D=[],R=[],PRE=null,PRER=null;
