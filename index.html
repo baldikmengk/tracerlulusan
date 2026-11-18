@@ -194,8 +194,17 @@
       lama = String(lama == null ? '' : lama); baru = String(baru == null ? '' : baru);
       if (baru.length < 6) throw new Error('Password baru minimal 6 karakter.');
       if (p.role === 'alumni' && nisn(baru) === p.nisn) throw new Error('Password baru tidak boleh sama dengan NISN.');
-      try { await F.reauthenticateWithCredential(u, F.EmailAuthProvider.credential(u.email, lama)); } catch (e) { throw new Error('Password lama salah.'); }
-      await F.updatePassword(u, baru);
+      var pesanAuth = function (e) {
+        var k = String((e && e.code) || '');
+        if (k === 'auth/wrong-password' || k === 'auth/invalid-credential' || k === 'auth/invalid-login-credentials') return 'Password lama salah.';
+        if (k === 'auth/too-many-requests') return 'Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi, atau minta admin mereset password.';
+        if (k === 'auth/network-request-failed') return 'Koneksi internet bermasalah. Coba lagi.';
+        if (k === 'auth/weak-password') return 'Password baru terlalu lemah. Gunakan minimal 6 karakter.';
+        if (k === 'auth/requires-recent-login') return 'Sesi sudah lama. Keluar, masuk kembali, lalu coba ganti password lagi.';
+        return 'Gagal mengganti password (' + (k || (e && e.message) || 'tidak diketahui') + ').';
+      };
+      try { await F.reauthenticateWithCredential(u, F.EmailAuthProvider.credential(u.email, lama)); } catch (e) { throw new Error(pesanAuth(e)); }
+      try { await F.updatePassword(u, baru); } catch (e) { throw new Error(pesanAuth(e)); }
       if (p.role === 'alumni' && p.defaultPw !== false) { await F.updateDoc(D('users', p.uid), { defaultPw: false }); PROF.defaultPw = false; }
       return true;
     },
